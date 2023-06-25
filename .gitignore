@@ -1,0 +1,5 @@
+data/
+.idea/
+settings/
+Test.py
+__pycache__/
