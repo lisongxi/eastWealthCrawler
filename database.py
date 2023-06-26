@@ -1,22 +1,11 @@
 import json
 import os.path
-
-from playhouse.pool import PooledMySQLDatabase
+from os import listdir
 
 from validating import BlockCapitalFlowHistory
+from models import BlockCFHistory, mysql1
 
-from config import get_settings
-
-__MYSQL_PARAMS__ = get_settings().eastWealth.mysql
-__SAVE_DIR__ = './data/'
-
-# 连接池
-mysql = PooledMySQLDatabase(
-    **__MYSQL_PARAMS__.dict(),
-    max_connections=10,  # 最大连接数
-    timeout=10,  # 池满阻止秒数
-    stale_timeout=300  # 最长连接时间
-)
+__SAVE_DIR__ = './data/'  # 设置文件基本路径
 
 
 def saveFile(file_path: str, file_data: dict):
@@ -42,9 +31,39 @@ def saveFile(file_path: str, file_data: dict):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-def to_sql():
-    print(1)
+def first_to_sql(file_path: str):
+    """首次将所有历史数据保存到数据库
+    """
+    # 创建表
+    mysql1.create_tables([BlockCFHistory])
+
+    listFiles = listdir(__SAVE_DIR__ + file_path)
+
+    # 遍历所有文件
+    for file_name in listFiles:
+
+        with open(file_path + file_name, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        with mysql1.atomic():
+            for i in range(0, len(data), 10):  # 一次插入10条
+                (BlockCFHistory
+                 .insert_many([dict(flow) for flow in data[i: i + 10]])
+                 .execute()
+                 )
+
+
+def renew_to_sql(DB_Model, data: dict):
+    """更新数据到数据库
+    """
+    with mysql1.atomic():
+        for i in range(0, len(data), 10):  # 一次插入10条
+            (DB_Model
+             .insert_many([dict(flow) for flow in data[i: i + 10]])
+             .execute()
+             )
 
 
 if __name__ == "__main__":
     print("hello")
+    # to_sql('板块历史资金流/')
