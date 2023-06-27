@@ -12,7 +12,7 @@ class Block(BaseModel):
 
 
 class BlockCapitalFlowHistory(Block):
-    """股票板块历史资金流数据模型
+    """股票板块历史资金流数据校验模型
     由于东财返回的是字符串，这里定义的类属性顺序不可乱
     """
     date: str
@@ -30,10 +30,10 @@ class BlockCapitalFlowHistory(Block):
     d_quote_change: str  # 当日涨跌幅
 
     @classmethod
-    def get_Block_cf(cls, blockCode, blockName, flowData):
-        attributes = flowData.split(",")[:-2]  # 去掉后两个元素
-        attributes.insert(0, blockCode)
-        attributes.insert(1, blockName)
+    def get_result_dict(cls, code, name, data):
+        attributes = data.split(",")[:-2]  # 去掉后两个元素
+        attributes.insert(0, code)
+        attributes.insert(1, name)
 
         mydict = dict(cls.__fields__)
 
@@ -42,7 +42,38 @@ class BlockCapitalFlowHistory(Block):
 
         block_cf = cls(**mydict)
 
-        return block_cf
+        return block_cf.dict()
+
+
+class BlockPriceHistory(Block):
+    """板块历史价格数据校验模型
+    """
+    date: str  # 日期
+    open_price: str  # 开盘价
+    close_price: str  # 收盘价
+    top_price: str  # 最高
+    low_price: str  # 最低
+    turnover: str  # 成交量
+    transaction: str  # 成交额
+    amplitude: str  # 振幅
+    quote_change: str  # 涨跌幅
+    change_amount: str  # 涨跌额
+    turnover_rate: str  # 换手率
+
+    @classmethod
+    def get_result_dict(cls, code, name, data):
+        attributes = data.split(",")
+        attributes.insert(0, code)
+        attributes.insert(1, name)
+
+        mydict = dict(cls.__fields__)
+
+        for key, value in zip(mydict.keys(), attributes):
+            mydict[key] = value
+
+        block_cf = cls(**mydict)
+
+        return block_cf.dict()
 
 
 def resp_to_dict(resp) -> dict:

@@ -105,8 +105,10 @@ class BasePayloadModel(BaseModel):
 class QueryPayload(BasePayloadModel):
     """板块历史资金流请求体模型
     """
-    lmt: str = None
+    lmt: str = None  # 交易日数量
     klt: str = None
+    fqt: str = None
+    end: str = None
     secid: str = None
     fields: str = None
     fields1: str = None
