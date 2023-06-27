@@ -10,6 +10,7 @@ from validating import resp_to_dict
 from errors import RequestBlockError
 from log import LogType, Log
 from database import saveFile
+from proxy import get_proxyInfo
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
@@ -29,7 +30,8 @@ def get_BlockInfo() -> list:
                                fields="f12,f14",
                                fid="f62",
                                fs="m:90+t:2").getDict()
-        blockInfoResp = resp_to_dict(requests.get(url=blockUrl, params=payload, headers=Headers.headers))
+        blockInfoResp = resp_to_dict(
+            requests.get(url=str(blockUrl), params=payload, headers=Headers.headers))
 
         return blockInfoResp['data']['diff']
     except Exception as err:
@@ -89,6 +91,7 @@ def block_price_crawl():
             host=URLs.h_StockUrl,
             path='/kline/get'
         )
+
         blockPriceResp = resp_to_dict(requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers))
 
         if blockPriceResp:

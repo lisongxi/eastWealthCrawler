@@ -123,6 +123,17 @@ class QueryPayload(BasePayloadModel):
         return dict_del_null(obj_dict)
 
 
+# --------------------------------------数据同步类型配置-----------------------------------------
+class DataSync:
+    """数据同步类型
+    Args:
+        full: 全量同步
+        increase: 增量同步
+    """
+    full = "full"
+    increase = "inc"
+
+
 if __name__ == "__main__":
     qp = QueryPayload(lmt="0",
                       klt="101",
