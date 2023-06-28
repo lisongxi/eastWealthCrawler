@@ -1,18 +1,15 @@
 import json
-
-import requests
 from yarl import URL
 from time import sleep
 from random import randint
 
 from config import get_settings, URLs, DataSync
-from database import saveFile
+from database import to_DB
 from proxy import get_proxyInfo, ProxyInfo, testGet_proxyInfo
 from errors import ProxyAddrError, RequestBlockError
 from log import LogType, Log
 from stock.blockCrawl import block_cf_crawl, block_price_crawl
-from stock.blockCrawl import get_BlockInfo
-from validating import resp_to_dict
+from DBModels import BlockPriceHistory, BlockCFHistory
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
@@ -61,7 +58,6 @@ class CrawlData:
         block_cf_crawl(sync=sync)  # 爬取板块资金流历史数据
         block_price_crawl(sync=sync)  # 爬取板块价格K线图数据
 
-
-if __name__ == "__main__":
-    craw = CrawlData()
-    craw.crawler()
+        # 保存到数据库
+        to_DB(DB_Model=BlockCFHistory, file_path='板块历史资金流/', sync=sync)
+        to_DB(DB_Model=BlockPriceHistory, file_path='板块价格K线数据/', sync=sync)

@@ -1,18 +1,19 @@
 """定时任务
 """
-import os
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from time import sleep
 
 from crawling import CrawlData
+from dateCount import saveDate
 
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler()  # 创建定时任务
 
 
 def CrawEastWealth():
     myCrawl = CrawlData()
-    myCrawl.crawler()
+    myCrawl.crawler()  # 爬取数据
+    saveDate()  # 保存同步时间
 
 
 # 由 trigger 参数指定触发器，来指定调用函数的方式。
@@ -28,13 +29,6 @@ scheduler.add_job(
     end_date='2023-06-26 19:00:00',
     timezone='Asia/Shanghai'
 )
-
-
-def my_job():
-    print('This is a scheduled job.')
-
-
-scheduler.add_job(my_job, 'interval', seconds=10)
 
 if __name__ == '__main__':
     # 开始执行任务

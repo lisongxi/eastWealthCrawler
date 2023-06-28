@@ -2,8 +2,10 @@ import json
 import os.path
 from os import listdir
 
-from DBModels import mysql1, BlockPriceHistory, BlockCFHistory
+from DBModels import mysql1
 from validating import get_result_dict
+from config import CrawlStatus
+from DBModels import BlockPriceHistory
 
 __SAVE_DIR__ = './data/'  # 设置文件基本路径
 
@@ -40,14 +42,17 @@ def saveFile(myModel, file_path: str, file_data: dict, sync: bool):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-def first_to_sql(DB_Model, file_path: str):
-    """首次将所有历史数据保存到数据库
+def to_DB(DB_Model, file_path: str, sync: bool):
+    """将数据保存到数据库
     Args:
         DB_Model: 数据库模型
         file_path: 文件路径
+        sync: 同步类型（增量True，全量False）
     """
-    # 创建表
-    mysql1.create_tables([DB_Model])
+    print(CrawlStatus.intoDB)
+
+    if not sync:
+        mysql1.create_tables([DB_Model])  # 创建表
 
     listFiles = listdir(__SAVE_DIR__ + file_path)
 
@@ -63,19 +68,3 @@ def first_to_sql(DB_Model, file_path: str):
                  .insert_many([dict(flow) for flow in data[i: i + num]])
                  .execute()
                  )
-
-
-def renew_to_sql(DB_Model, data: dict):
-    """更新数据到数据库
-    """
-    with mysql1.atomic():
-        for i in range(0, len(data), num := 100):  # 一次插入100条
-            (DB_Model
-             .insert_many([dict(flow) for flow in data[i: i + num]])
-             .execute()
-             )
-
-
-if __name__ == "__main__":
-    print("hello")
-    first_to_sql(BlockPriceHistory, '板块价格K线数据/')

@@ -1,4 +1,3 @@
-from playhouse.mysql_ext import JSONField
 from config import get_settings
 from playhouse.pool import PooledMySQLDatabase
 from peewee import (
@@ -25,7 +24,7 @@ class BlockCFHistory(Model):
     id = BigAutoField(null=False, primary_key=True)  # 一个主键，且不可为空,为每个新记录自动生成一个唯一值
     blockCode = CharField(max_length=24, null=False, verbose_name='板块编号')  # 短字符串, 需要指定最大长度
     blockName = CharField(max_length=24, null=False, verbose_name='板块名称')  # 短字符串, 需要指定最大长度
-    date = DateField(null=False, verbose_name='日期')  # 日期
+    b_date = DateField(null=False, verbose_name='日期')  # 日期
     main_net_inflow = CharField(max_length=32, null=False, verbose_name='主力净流入')
     small_net_inflow = CharField(max_length=32, null=False, verbose_name='小单净流入')
     mid_net_inflow = CharField(max_length=32, null=False, verbose_name='中单净流入')
@@ -49,7 +48,7 @@ class BlockPriceHistory(Model):
     id = BigAutoField(null=False, primary_key=True)
     blockCode = CharField(max_length=24, null=False, verbose_name='板块编号')
     blockName = CharField(max_length=24, null=False, verbose_name='板块名称')
-    date = DateField(null=False, verbose_name='日期')  # 日期
+    b_date = DateField(null=False, verbose_name='日期')  # 日期
     open_price = CharField(max_length=32, null=False, verbose_name='开盘价')
     close_price = CharField(max_length=32, null=False, verbose_name='收盘价')
     top_price = CharField(max_length=32, null=False, verbose_name='最高')

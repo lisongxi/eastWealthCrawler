@@ -5,7 +5,7 @@ import requests
 
 from validating import BlockCapitalFlowHistory, BlockPriceHistory
 
-from config import URLs, Headers, QueryPayload, get_settings
+from config import URLs, Headers, QueryPayload, get_settings, CrawlStatus
 from validating import resp_to_dict
 from errors import RequestBlockError
 from log import LogType, Log
@@ -42,6 +42,8 @@ def block_cf_crawl(sync: bool):
     Args:
         sync: 增量同步（True) , 全量同步（False）
     """
+    print(CrawlStatus.crawling)
+
     try:
         blockList = get_BlockInfo()
     except RequestBlockError as err:
@@ -76,6 +78,7 @@ def block_price_crawl(sync: bool):
     Args:
         sync: 增量同步（True) , 全量同步（False）
     """
+    print(CrawlStatus.crawling)
     try:
         blockList = get_BlockInfo()
     except RequestBlockError as err:
@@ -101,7 +104,3 @@ def block_price_crawl(sync: bool):
         if blockPriceResp:
             saveFile(myModel=BlockPriceHistory, file_path="板块价格K线数据", file_data=blockPriceResp,
                      sync=sync)
-
-
-if __name__ == "__main__":
-    print("hello")

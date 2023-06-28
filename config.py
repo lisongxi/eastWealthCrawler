@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from cachier import cachier
 import yaml
 import time
-import requests
 
 from validating import dict_del_null
 
@@ -64,7 +63,8 @@ class Settings(BaseModel):
     eastWealth: EastWealth
 
 
-@cachier(backend='memory')
+# --------------------------------------配置文件配置----------------------------------------
+@cachier(backend='memory')  # 全局缓存
 def get_settings() -> Settings:
     """获取配置信息
     """
@@ -115,7 +115,7 @@ class QueryPayload(BasePayloadModel):
     fields2: str = None
     _: str = str(int(time.time()))
 
-    # 访问 '_' 属性 ,因为在python中，单下划线代表内部属性。偏偏东财又要一个'_'参数
+    # 访问 '_' 属性 。因为在python中，单下划线代表保留属性。偏偏东财又要一个'_'参数
     def getDict(self) -> dict:
         ts = self._
         obj_dict = self.__dict__
@@ -123,7 +123,7 @@ class QueryPayload(BasePayloadModel):
         return dict_del_null(obj_dict)
 
 
-# --------------------------------------数据同步类型配置-----------------------------------------
+# --------------------------------------数据同步类型配置--------------------------------------
 class DataSync:
     """数据同步类型
     :cvar full: 全量同步
@@ -133,25 +133,10 @@ class DataSync:
     increase = True
 
 
-# --------------------------------------数据同步类型配置-----------------------------------------
+# --------------------------------------爬虫状态配置-----------------------------------------
 class CrawlStatus:
     """爬虫状态
     """
     crawling = "爬取数据中..."
+    saveFile = "保存文件中..."
     intoDB = "写入数据库中..."
-
-
-if __name__ == "__main__":
-    qp = QueryPayload(lmt="0",
-                      klt="101",
-                      secid="90.",
-                      fields1="f1,f2,f3,f7",
-                      fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65"
-                      ).getDict()
-    print(qp)
-
-    # 注意
-    # 如果要直接 print(vars(qp)) ，这是无法访问 _ 的
-    # 1. 实例属性的查找顺序是先查实例的 __dict__,然后才是类的 __dict__
-    # 2. vars() 只显示实例自己的属性,不显示从类继承而来的属性
-    # 3. 调用 getDict() 方法后,_ 属性被添加到了实例的 __dict__ 中,所以被 vars() 显示,并且实例访问 _ 时也会首先在实例的 __dict__ 中查找到该属性。

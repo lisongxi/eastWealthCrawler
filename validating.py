@@ -15,7 +15,7 @@ class BlockCapitalFlowHistory(Block):
     """股票板块历史资金流数据校验模型
     由于东财返回的是字符串，这里定义的类属性顺序不可乱
     """
-    date: str
+    b_date: str
     main_net_inflow: str  # 主力净流入
     small_net_inflow: str  # 小单净流入
     mid_net_inflow: str  # 中单净流入
@@ -33,7 +33,7 @@ class BlockCapitalFlowHistory(Block):
 class BlockPriceHistory(Block):
     """板块历史价格数据校验模型
     """
-    date: str  # 日期
+    b_date: str  # 日期
     open_price: str  # 开盘价
     close_price: str  # 收盘价
     top_price: str  # 最高
