@@ -51,9 +51,6 @@ class CrawlData:
         # 首次运行，默认是全量同步；以后都默认是 增量同步。
         with open(__SYNC_PATH__, 'r', encoding='utf-8') as f1:
             sync = json.load(f1)['sync']
-        with open(__SYNC_PATH__, 'w', encoding='utf-8') as f2:
-            s = {"sync": DataSync.increase}
-            json.dump(s, f2)
 
         block_cf_crawl(sync=sync)  # 爬取板块资金流历史数据
         block_price_crawl(sync=sync)  # 爬取板块价格K线图数据
@@ -61,3 +58,8 @@ class CrawlData:
         # 保存到数据库
         to_DB(DB_Model=BlockCFHistory, file_path='板块历史资金流/', sync=sync)
         to_DB(DB_Model=BlockPriceHistory, file_path='板块价格K线数据/', sync=sync)
+
+        # 保存之后执行都是默认 增量同步
+        with open(__SYNC_PATH__, 'w', encoding='utf-8') as f2:
+            s = {"sync": DataSync.increase}
+            json.dump(s, f2)
