@@ -10,7 +10,6 @@ from validating import resp_to_dict
 from errors import RequestBlockError
 from log import LogType, Log
 from database import saveFile
-from proxy import get_proxyInfo
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
@@ -38,8 +37,10 @@ def get_BlockInfo() -> list:
         raise RequestBlockError('%s', err)
 
 
-def block_cf_crawl():
+def block_cf_crawl(sync: bool):
     """爬取板块历史资金流
+    Args:
+        sync: 增量同步（True) , 全量同步（False）
     """
     try:
         blockList = get_BlockInfo()
@@ -49,11 +50,11 @@ def block_cf_crawl():
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
     for blockInfo in blockList:
-        blockCFPayload = QueryPayload(lmt="0",
+        blockCFPayload = QueryPayload(lmt="250",
                                       klt="101",
                                       secid="90." + blockInfo['f12'],
                                       fields1="f1,f2,f3,f7",
-                                      fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65"
+                                      fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63"
                                       ).getDict()
 
         # 板块历史资金流链接
@@ -66,11 +67,14 @@ def block_cf_crawl():
         blockResp = resp_to_dict(requests.get(url=str(blockCFHUrl), params=blockCFPayload, headers=Headers.headers))
 
         if blockResp:
-            saveFile(myModel=BlockCapitalFlowHistory, file_path="板块历史资金流", file_data=blockResp)
+            saveFile(myModel=BlockCapitalFlowHistory, file_path="板块历史资金流", file_data=blockResp,
+                     sync=sync)
 
 
-def block_price_crawl():
+def block_price_crawl(sync: bool):
     """爬取板块历史价格K线图数据
+    Args:
+        sync: 增量同步（True) , 全量同步（False）
     """
     try:
         blockList = get_BlockInfo()
@@ -95,7 +99,8 @@ def block_price_crawl():
         blockPriceResp = resp_to_dict(requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers))
 
         if blockPriceResp:
-            saveFile(myModel=BlockPriceHistory, file_path="板块价格K线数据", file_data=blockPriceResp)
+            saveFile(myModel=BlockPriceHistory, file_path="板块价格K线数据", file_data=blockPriceResp,
+                     sync=sync)
 
 
 if __name__ == "__main__":

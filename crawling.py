@@ -1,9 +1,11 @@
+import json
+
 import requests
 from yarl import URL
 from time import sleep
 from random import randint
 
-from config import get_settings, URLs, QueryPayload, Headers
+from config import get_settings, URLs, DataSync
 from database import saveFile
 from proxy import get_proxyInfo, ProxyInfo, testGet_proxyInfo
 from errors import ProxyAddrError, RequestBlockError
@@ -14,6 +16,8 @@ from validating import resp_to_dict
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
+
+__SYNC_PATH__ = './settings/sync.json'  # 同步方式
 
 target = URL().build(
     scheme='https',
@@ -46,8 +50,16 @@ class CrawlData:
     def crawler(self, pInfo: ProxyInfo = proxyInfo):
         """爬取数据
         """
-        # block_cf_crawl()  # 爬取板块资金流历史数据
-        block_price_crawl()  # 爬取板块价格K线图数据
+
+        # 首次运行，默认是全量同步；以后都默认是 增量同步。
+        with open(__SYNC_PATH__, 'r', encoding='utf-8') as f1:
+            sync = json.load(f1)['sync']
+        with open(__SYNC_PATH__, 'w', encoding='utf-8') as f2:
+            s = {"sync": DataSync.increase}
+            json.dump(s, f2)
+
+        block_cf_crawl(sync=sync)  # 爬取板块资金流历史数据
+        block_price_crawl(sync=sync)  # 爬取板块价格K线图数据
 
 
 if __name__ == "__main__":

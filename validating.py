@@ -3,7 +3,7 @@
 import json
 import re
 from pydantic import BaseModel
-from datetime import datetime
+from dateCount import judgeDate
 
 
 class Block(BaseModel):
@@ -29,21 +29,6 @@ class BlockCapitalFlowHistory(Block):
     d_closing_price: str  # 当日收盘价
     d_quote_change: str  # 当日涨跌幅
 
-    @classmethod
-    def get_result_dict(cls, code, name, data):
-        attributes = data.split(",")[:-2]  # 去掉后两个元素
-        attributes.insert(0, code)
-        attributes.insert(1, name)
-
-        mydict = dict(cls.__fields__)
-
-        for key, value in zip(mydict.keys(), attributes):
-            mydict[key] = value
-
-        block_cf = cls(**mydict)
-
-        return block_cf.dict()
-
 
 class BlockPriceHistory(Block):
     """板块历史价格数据校验模型
@@ -60,21 +45,6 @@ class BlockPriceHistory(Block):
     change_amount: str  # 涨跌额
     turnover_rate: str  # 换手率
 
-    @classmethod
-    def get_result_dict(cls, code, name, data):
-        attributes = data.split(",")
-        attributes.insert(0, code)
-        attributes.insert(1, name)
-
-        mydict = dict(cls.__fields__)
-
-        for key, value in zip(mydict.keys(), attributes):
-            mydict[key] = value
-
-        block_cf = cls(**mydict)
-
-        return block_cf.dict()
-
 
 def resp_to_dict(resp) -> dict:
     """将返回数据转换成字典
@@ -88,3 +58,30 @@ def dict_del_null(payload) -> dict:
     """删除字典中值为空的键值对
     """
     return {k: v for k, v in payload.items() if v}
+
+
+def get_result_dict(model, code: str, name: str, data: str, sync: bool) -> dict:
+    """结合校验模型，创建数据字典
+    Args:
+        model: 模型
+        code: 板块编号
+        name: 板块名字
+        data: 板块数据
+        sync: 同步方式
+    """
+    attributes = data.split(",")
+
+    if sync and judgeDate(attributes[0]):
+        return {}
+
+    attributes.insert(0, code)
+    attributes.insert(1, name)
+
+    mydict = dict(model.__fields__)
+
+    for key, value in zip(mydict.keys(), attributes):
+        mydict[key] = value
+
+    blockDict = model(**mydict).dict()
+
+    return blockDict

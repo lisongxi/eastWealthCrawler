@@ -126,12 +126,19 @@ class QueryPayload(BasePayloadModel):
 # --------------------------------------数据同步类型配置-----------------------------------------
 class DataSync:
     """数据同步类型
-    Args:
-        full: 全量同步
-        increase: 增量同步
+    :cvar full: 全量同步
+    :cvar increase: 增量同步
     """
-    full = "full"
-    increase = "inc"
+    full = False
+    increase = True
+
+
+# --------------------------------------数据同步类型配置-----------------------------------------
+class CrawlStatus:
+    """爬虫状态
+    """
+    crawling = "爬取数据中..."
+    intoDB = "写入数据库中..."
 
 
 if __name__ == "__main__":

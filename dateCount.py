@@ -6,20 +6,19 @@ from datetime import date, datetime
 __Date_PATH__ = './settings/date.json'
 
 
-def getDateInterval() -> str:
-    """计算日期间隔天数
+def judgeDate(t_date: str) -> bool:
+    """计算日期先后
     """
     with open(__Date_PATH__, 'r', encoding='utf-8') as f:
         file_date = json.load(f)["expiration_date"]
 
     last_day = datetime.strptime(file_date, "%Y-%m-%d").date()
-    today = date.today()
+    t_date = datetime.strptime(t_date, "%Y-%m-%d").date()
 
-    # 计算时间差
-    delta = today - last_day
-    delta_days = delta.days
+    # 计算 股票日期 是否小于等于 数据最后保存日期
+    delta = t_date <= last_day
 
-    return str(delta_days)
+    return delta
 
 
 def saveDate():
