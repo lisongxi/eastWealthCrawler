@@ -10,15 +10,15 @@ from pydantic import BaseModel
 from errors import ProxyAddrError
 
 # 代理池参数
-proxyAddr = "127.0.0.1:5000"
-authKey = "helloworld"
+proxyAddr = ""
+authKey = ""
 authPwd = ""
 
 # 获取代理IP信息的地址
 proxyUrl = URL().build(
-    scheme='http',
-    host='127.0.0.1:5000',
-    path='/get',
+    scheme='',
+    host='',
+    path='',
     query={'authkey': authKey}
 )
 
@@ -52,7 +52,3 @@ def testGet_proxyInfo():
     下次再搞
     """
     return 0
-
-
-if __name__ == "__main__":
-    print()

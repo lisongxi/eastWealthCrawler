@@ -13,4 +13,13 @@
 ### 2，启动
 > `main.py` ，直接运行
 > 
-> `scheduler.py` ，可执行定时任务
+> `scheduler.py` ，可执行定时任务 
+
+## 结果
+### 1，窗口输出
+![img.png](./assets/img/img.png)
+
+### 2，数据库
+![img_1.png](./assets/img/img_1.png)
+
+![img_2.png](./assets/img/img_2.png)
