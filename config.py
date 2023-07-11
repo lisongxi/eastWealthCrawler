@@ -8,7 +8,7 @@ from cachier import cachier
 import yaml
 import time
 
-from validating import dict_del_null
+from s_block.blockVD import dict_del_null
 
 __SETTINGS_PATH__ = './settings/settings.yaml'
 
@@ -103,7 +103,7 @@ class BasePayloadModel(BaseModel):
 
 
 class QueryPayload(BasePayloadModel):
-    """板块历史资金流请求体模型
+    """基本请求体模型
     """
     lmt: str = None  # 交易日数量
     klt: str = None

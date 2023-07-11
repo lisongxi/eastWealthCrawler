@@ -1,9 +1,9 @@
-"""数据校验
+"""板块数据校验
 """
 import json
 import re
 from pydantic import BaseModel
-from dateCount import judgeDate
+from function import judgeDate
 
 
 class Block(BaseModel):
@@ -49,8 +49,9 @@ class BlockPriceHistory(Block):
 def resp_to_dict(resp) -> dict:
     """将返回数据转换成字典
     """
+    response = resp.text
     objLocation = re.compile(r"jQuery.*?\u0028(?P<dataJson>.*?)\u0029;", re.S)
-    result = json.loads(objLocation.findall(resp.text)[0])
+    result = json.loads(objLocation.findall(response)[0])
     return result
 
 

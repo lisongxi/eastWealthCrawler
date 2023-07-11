@@ -3,13 +3,13 @@
 from yarl import URL
 import requests
 
-from validating import BlockCapitalFlowHistory, BlockPriceHistory
+from s_block.blockVD import BlockCapitalFlowHistory, BlockPriceHistory
 
 from config import URLs, Headers, QueryPayload, get_settings, CrawlStatus
-from validating import resp_to_dict
+from s_block.blockVD import resp_to_dict
 from errors import RequestBlockError
 from log import LogType, Log
-from database import saveFile
+from dataProcessor import saveFile
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
@@ -34,6 +34,7 @@ def get_BlockInfo() -> list:
 
         return blockInfoResp['data']['diff']
     except Exception as err:
+        print(err)
         raise RequestBlockError('%s', err)
 
 
@@ -52,7 +53,7 @@ def block_cf_crawl(sync: bool):
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
     for blockInfo in blockList:
-        blockCFPayload = QueryPayload(lmt="250",
+        blockCFPayload = QueryPayload(lmt="0",
                                       klt="101",
                                       secid="90." + blockInfo['f12'],
                                       fields1="f1,f2,f3,f7",
@@ -66,7 +67,9 @@ def block_cf_crawl(sync: bool):
             path='/fflow/daykline/get'
         )
 
-        blockResp = resp_to_dict(requests.get(url=str(blockCFHUrl), params=blockCFPayload, headers=Headers.headers))
+        resp = requests.get(url=str(blockCFHUrl), params=blockCFPayload, headers=Headers.headers)
+
+        blockResp = resp_to_dict(resp)
 
         if blockResp:
             saveFile(myModel=BlockCapitalFlowHistory, file_path="板块历史资金流", file_data=blockResp,

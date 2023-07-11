@@ -4,12 +4,12 @@ from time import sleep
 from random import randint
 
 from config import get_settings, URLs, DataSync
-from database import to_DB
-from proxy import get_proxyInfo, ProxyInfo, testGet_proxyInfo
-from errors import ProxyAddrError, RequestBlockError
+from dataProcessor import to_DB
+from proxy import ProxyInfo, testGet_proxyInfo
+from errors import ProxyAddrError
 from log import LogType, Log
-from stock.blockCrawl import block_cf_crawl, block_price_crawl
-from DBModels import BlockPriceHistory, BlockCFHistory
+from s_block.blockCrawl import block_cf_crawl, block_price_crawl
+from s_block.blockDM import BlockPriceHistory, BlockCFHistory
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
