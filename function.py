@@ -9,7 +9,7 @@ __Date_PATH__ = './settings/date.json'
 
 
 def judgeDate(t_date: str) -> bool:
-    """计算日期先后
+    """判断日期先后
     """
     with open(__Date_PATH__, 'r', encoding='utf-8') as f:
         file_date = json.load(f)["expiration_date"]

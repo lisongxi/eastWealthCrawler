@@ -74,7 +74,7 @@ def get_settings() -> Settings:
 
 
 # --------------------------------------请求体配置-----------------------------------------
-class URLs:
+class URLs(Enum):
     """关键URL清单
     """
     t_StockUrl = "push2.eastmoney.com/api/qt/clist/get"  # 今日股票数据链接
@@ -124,7 +124,7 @@ class QueryPayload(BasePayloadModel):
 
 
 # --------------------------------------数据同步类型配置--------------------------------------
-class DataSync:
+class DataSync(Enum):
     """数据同步类型
     :cvar full: 全量同步
     :cvar increase: 增量同步
@@ -134,9 +134,10 @@ class DataSync:
 
 
 # --------------------------------------爬虫状态配置-----------------------------------------
-class CrawlStatus:
+class CrawlStatus(Enum):
     """爬虫状态
     """
     crawling = "爬取数据中..."
     saveFile = "保存文件中..."
     intoDB = "写入数据库中..."
+

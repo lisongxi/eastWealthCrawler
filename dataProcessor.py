@@ -5,6 +5,7 @@ from os import listdir
 from s_block.blockDM import mysql1
 from s_block.blockVD import get_result_dict
 from config import CrawlStatus
+from errors import SaveFileError, ToDataBaseError
 
 __SAVE_DIR__ = './data/'  # 设置文件基本路径
 
@@ -17,28 +18,33 @@ def saveFile(myModel, file_path: str, file_data: dict, sync: bool):
         file_data: 待保存数据
         sync: 同步类型（增量True，全量False）
     """
-    Code = file_data['data']['code']
-    Name = file_data['data']['name']
+    try:
+        Code = file_data['data']['code']
+        Name = file_data['data']['name']
 
-    data = []
+        data = []
 
-    for crawlData in reversed(file_data['data']['klines']):
-        result = get_result_dict(model=myModel, code=Code, name=Name, data=crawlData, sync=sync)
-        if not result:
-            break
-        data.append(result)
+        for crawlData in reversed(file_data['data']['klines']):
+            result = get_result_dict(model=myModel, code=Code, name=Name, data=crawlData, sync=sync)
+            if not result:
+                break
+            data.append(result)
 
-    os.makedirs(__SAVE_DIR__ + file_path, exist_ok=True)  # 创建文件路径
-    path = os.path.join(__SAVE_DIR__ + file_path, str(Code) + '.json')  # 创建文件
+        os.makedirs(__SAVE_DIR__ + file_path, exist_ok=True)  # 创建文件路径
+        path = os.path.join(__SAVE_DIR__ + file_path, str(Code) + '.json')  # 创建文件
 
-    # # 这个是拼接旧数据，需要可以自行使用
-    # if os.path.exists(path):
-    #     with open(path, 'r', encoding='utf-8') as f:
-    #         oldData = json.load(f)
-    #     data = oldData + data
+        # # 这个是拼接旧数据，需要可以自行使用
+        # if os.path.exists(path):
+        #     with open(path, 'r', encoding='utf-8') as f:
+        #         oldData = json.load(f)
+        #     data = oldData + data
 
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    except Exception as err:
+        print(err)
+        raise SaveFileError('%s', err)
 
 
 def to_DB(DB_Model, file_path: str, sync: bool):
@@ -48,22 +54,26 @@ def to_DB(DB_Model, file_path: str, sync: bool):
         file_path: 文件路径
         sync: 同步类型（增量True，全量False）
     """
-    print(CrawlStatus.intoDB)
+    try:
+        print(CrawlStatus.intoDB)
 
-    if not sync:
-        mysql1.create_tables([DB_Model])  # 创建表
+        if not sync:
+            mysql1.create_tables([DB_Model])  # 创建表
 
-    listFiles = listdir(__SAVE_DIR__ + file_path)
+        listFiles = listdir(__SAVE_DIR__ + file_path)
 
-    # 遍历所有文件
-    for file_name in listFiles:
+        # 遍历所有文件
+        for file_name in listFiles:
 
-        with open(__SAVE_DIR__ + file_path + file_name, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            with open(__SAVE_DIR__ + file_path + file_name, 'r', encoding='utf-8') as f:
+                data = json.load(f)
 
-        with mysql1.atomic():
-            for i in range(0, len(data), num := 100):  # 一次插入100条
-                (DB_Model
-                 .insert_many([dict(flow) for flow in data[i: i + num]])
-                 .execute()
-                 )
+            with mysql1.atomic():
+                for i in range(0, len(data), num := 100):  # 一次插入100条
+                    (DB_Model
+                     .insert_many([dict(flow) for flow in data[i: i + num]])
+                     .execute()
+                     )
+    except Exception as err:
+        print(err)
+        raise ToDataBaseError('%s', err)

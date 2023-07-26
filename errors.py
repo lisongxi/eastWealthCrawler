@@ -19,3 +19,13 @@ class ProxyAddrError(Error):
 class RequestBlockError(Error):
     """获取板块信息异常
     """
+
+
+class SaveFileError(Error):
+    """保存数据错误
+    """
+
+
+class ToDataBaseError(Error):
+    """写入数据库错误
+    """

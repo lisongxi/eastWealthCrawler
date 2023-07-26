@@ -12,19 +12,20 @@ import json
 
 from config import get_settings, Freq
 
-settings = get_settings()
+settings = get_settings()  # 获取settings配置文件
 
+# 日期格式化模板
 __FREQS__ = {'month': '%Y%m', 'day': '%Y%m%d', 'hour': '%Y%m%d%H'}
 
 # 自定义 日志频率
-freq = __FREQS__[settings.log.freq.day.value]  # 通过 Settings类 找到 Freq类 的值
+freq = __FREQS__[settings.log.freq.value]  # 通过 Settings类 找到 Freq类 的值
 
 
 class LogType(Enum):
     """日志类型
     """
-    run_error = '运行出错'  # 运行出错
-    save_file = '爬取数据成功'  # 爬取数据成功
+    run_error = '运行出错'
+    save_file = '爬取数据成功'
 
 
 class Log:
@@ -33,7 +34,7 @@ class Log:
     _file_format = '.txt'
     _intro_template = "By {username}, at {datetime}, content: \n"
 
-    def __init__(self, *, path: str, freq: Freq = freq, useUTC: bool = settings.log.useUTC, logType: LogType):
+    def __init__(self, *, path: str, fq: str = freq, useUTC: bool = settings.log.useUTC, logType: LogType):
         """初始化
         生成文件名后缀
         Args:
@@ -42,9 +43,11 @@ class Log:
             useUTC：是否使用UTC时间
             path：文件夹路径
         """
-        now = datetime.utcnow() if useUTC else datetime.now()
-        file_suffix = now.strftime(freq)
-        self.file = os.path.join(path, logType + '_' + file_suffix + self._file_format)  # 自动拼接路径
+        now = datetime.utcnow() if useUTC else datetime.now()  # 当前时间
+
+        file_suffix = now.strftime(fq)  # 时间格式转化
+
+        self.file = os.path.join(path, logType.value + '_' + file_suffix + self._file_format)  # 自动拼接路径
         self.datetime = now.isoformat()  # 将一个datetime对象转换为ISO 8601格式的字符串。
 
     @classmethod
@@ -81,7 +84,7 @@ class Log:
         if isinstance(content, str):
             text = content
         elif isinstance(content, Exception):
-            text = self._trace_error(err=content) + '\n' + '-' * 200 + ('\n%s' % content)
+            text = self._trace_error(err=content) + '\n' + '-' * 200 + (f'\n%s' % content)
         elif isinstance(content, BaseModel):
             text = json.dumps(
                 jsonable_encoder(content.dict(exclude_unset=True)),

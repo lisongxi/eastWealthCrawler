@@ -7,7 +7,7 @@ from s_block.blockVD import BlockCapitalFlowHistory, BlockPriceHistory
 
 from config import URLs, Headers, QueryPayload, get_settings, CrawlStatus
 from s_block.blockVD import resp_to_dict
-from errors import RequestBlockError
+from errors import RequestBlockError, SaveFileError
 from log import LogType, Log
 from dataProcessor import saveFile
 
@@ -34,8 +34,31 @@ def get_BlockInfo() -> list:
 
         return blockInfoResp['data']['diff']
     except Exception as err:
-        print(err)
-        raise RequestBlockError('%s', err)
+        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
+        myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
+        return []
+
+
+def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel, file_path: str):
+    """爬取板块数据,保存文件
+    Args:
+        sync: 增量同步（True) , 全量同步（False）
+        blockUrl: 板块链接
+        blockPayload: 请求参数
+        blockModel: 板块数据模型
+        file_path: 文件保存路径
+    """
+    # 发起请求
+    response = requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers)
+
+    blockResp = resp_to_dict(response)
+
+    if blockResp:
+        try:
+            saveFile(myModel=blockModel, file_path=file_path, file_data=blockResp, sync=sync)
+        except SaveFileError as err:
+            sfLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
+            sfLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
 
 def block_cf_crawl(sync: bool):
@@ -49,7 +72,7 @@ def block_cf_crawl(sync: bool):
         blockList = get_BlockInfo()
     except RequestBlockError as err:
         blockList = []  # 获取板块列表失败
-        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error.value)
+        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
     for blockInfo in blockList:
@@ -67,13 +90,9 @@ def block_cf_crawl(sync: bool):
             path='/fflow/daykline/get'
         )
 
-        resp = requests.get(url=str(blockCFHUrl), params=blockCFPayload, headers=Headers.headers)
-
-        blockResp = resp_to_dict(resp)
-
-        if blockResp:
-            saveFile(myModel=BlockCapitalFlowHistory, file_path="板块历史资金流", file_data=blockResp,
-                     sync=sync)
+        # 抓取数据，保存文件
+        blockCrawlAndSave(sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
+                     blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
 
 
 def block_price_crawl(sync: bool):
@@ -86,7 +105,7 @@ def block_price_crawl(sync: bool):
         blockList = get_BlockInfo()
     except RequestBlockError as err:
         blockList = []  # 获取板块列表失败
-        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error.value)
+        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
     for blockInfo in blockList:
@@ -96,14 +115,12 @@ def block_price_crawl(sync: bool):
                                     fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61").getDict()
 
         # 板块价格链接
-        blockUrl = URL.build(
+        blockPUrl = URL.build(
             scheme='https',
             host=URLs.h_StockUrl,
             path='/kline/get'
         )
 
-        blockPriceResp = resp_to_dict(requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers))
-
-        if blockPriceResp:
-            saveFile(myModel=BlockPriceHistory, file_path="板块价格K线数据", file_data=blockPriceResp,
-                     sync=sync)
+        # 抓取数据，保存文件
+        blockCrawlAndSave(sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
+                     blockModel=BlockPriceHistory, file_path="板块价格K线数据")

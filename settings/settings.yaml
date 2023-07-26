@@ -1,6 +1,6 @@
 sysAdmin: superAdmin
 log:
-  freq: hour
+  freq: day
   useUTC: false
 eastWealth:
   user:
