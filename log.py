@@ -38,7 +38,7 @@ class Log:
         """初始化
         生成文件名后缀
         Args:
-            freq：日志频率
+            fq：日志频率
             fmt：写入文件格式，默认为 txt
             useUTC：是否使用UTC时间
             path：文件夹路径
