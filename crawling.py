@@ -1,13 +1,9 @@
 import json
 from yarl import URL
-from time import sleep
-from random import randint
 
-from config import get_settings, URLs, DataSync
+from config import get_settings, URLs
 from dataProcessor import to_DB
-from proxy import ProxyInfo, testGet_proxyInfo
-from errors import ProxyAddrError
-from log import LogType, Log
+
 from s_block.blockCrawl import block_cf_crawl, block_price_crawl
 from s_block.blockDM import BlockPriceHistory, BlockCFHistory
 
@@ -22,21 +18,6 @@ target = URL().build(
 )
 
 globalSettings = get_settings()
-
-
-def get_random_sleep():
-    """随机睡眠
-    """
-    sleep(randint(1, 4))
-
-
-# 使用代理池(暂时没有代理池，下次再用 get_proxyInfo 函数)
-try:
-    proxyInfo = testGet_proxyInfo()
-except ProxyAddrError as err:
-    myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
-    myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
-    quit()  # 退出进程
 
 
 # 爬取数据
@@ -56,5 +37,5 @@ def crawler():
 
     # 保存之后执行都是默认 增量同步
     with open(__SYNC_PATH__, 'w', encoding='utf-8') as f2:
-        s = {"sync": DataSync.increase}
+        s = {"sync": False}
         json.dump(s, f2)

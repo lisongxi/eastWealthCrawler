@@ -74,7 +74,7 @@ def get_settings() -> Settings:
 
 
 # --------------------------------------请求体配置-----------------------------------------
-class URLs(Enum):
+class URLs:
     """关键URL清单
     """
     t_StockUrl = "push2.eastmoney.com/api/qt/clist/get"  # 今日股票数据链接
@@ -140,4 +140,3 @@ class CrawlStatus(Enum):
     crawling = "爬取数据中..."
     saveFile = "保存文件中..."
     intoDB = "写入数据库中..."
-

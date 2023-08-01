@@ -4,15 +4,14 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from time import sleep
 
-from crawling import CrawlData
 from function import saveDate
+from crawling import crawler
 
 scheduler = BackgroundScheduler()  # 创建定时任务
 
 
 def CrawEastWealth():
-    myCrawl = CrawlData()
-    myCrawl.crawler()  # 爬取数据
+    crawler()  # 爬取数据
     saveDate()  # 保存同步时间
 
 

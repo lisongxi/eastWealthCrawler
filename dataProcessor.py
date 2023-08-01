@@ -55,7 +55,7 @@ def to_DB(DB_Model, file_path: str, sync: bool):
         sync: 同步类型（增量True，全量False）
     """
     try:
-        print(CrawlStatus.intoDB)
+        print(CrawlStatus.intoDB.value)
 
         if not sync:
             mysql1.create_tables([DB_Model])  # 创建表

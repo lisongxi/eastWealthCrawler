@@ -66,7 +66,7 @@ def block_cf_crawl(sync: bool):
     Args:
         sync: 增量同步（True) , 全量同步（False）
     """
-    print(CrawlStatus.crawling)
+    print(CrawlStatus.crawling.value)
 
     try:
         blockList = get_BlockInfo()
@@ -92,7 +92,7 @@ def block_cf_crawl(sync: bool):
 
         # 抓取数据，保存文件
         blockCrawlAndSave(sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
-                     blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
+                          blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
 
 
 def block_price_crawl(sync: bool):
@@ -100,7 +100,8 @@ def block_price_crawl(sync: bool):
     Args:
         sync: 增量同步（True) , 全量同步（False）
     """
-    print(CrawlStatus.crawling)
+    print(CrawlStatus.crawling.value)
+
     try:
         blockList = get_BlockInfo()
     except RequestBlockError as err:
@@ -123,4 +124,4 @@ def block_price_crawl(sync: bool):
 
         # 抓取数据，保存文件
         blockCrawlAndSave(sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
-                     blockModel=BlockPriceHistory, file_path="板块价格K线数据")
+                          blockModel=BlockPriceHistory, file_path="板块价格K线数据")

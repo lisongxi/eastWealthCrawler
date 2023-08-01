@@ -10,7 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from typing import Union, Optional
 import json
 
-from config import get_settings, Freq
+from config import get_settings
 
 settings = get_settings()  # 获取settings配置文件
 
