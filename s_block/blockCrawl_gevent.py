@@ -1,11 +1,16 @@
 """股票板块相关
+使用gevent库进行并发
 """
+import gevent
+from gevent import monkey
+
+monkey.patch_all()  # 注意，这三个gevent相关的一定要放在其他库之前import
+
 from yarl import URL
 import requests
 
-from s_block.blockVD import BlockCapitalFlowHistory, BlockPriceHistory
+from s_block.blockVD import BlockCapitalFlowHistory, BlockPriceHistory, resp_to_dict
 from config import URLs, Headers, QueryPayload, get_settings, CrawlStatus
-from s_block.blockVD import resp_to_dict
 from errors import RequestBlockError, SaveFileError
 from log import LogType, Log
 from dataProcessor import saveFile
@@ -45,6 +50,7 @@ def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel,
         blockModel: 板块数据模型
         file_path: 文件保存路径
     """
+
     # 发起请求
     response = requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers)
 
@@ -72,6 +78,8 @@ def block_cf_crawl(sync: bool):
         myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
+    bccTasks = []  # 任务列表
+
     for blockInfo in blockList:
         blockCFPayload = QueryPayload(lmt="0",
                                       klt="101",
@@ -88,8 +96,14 @@ def block_cf_crawl(sync: bool):
         )
 
         # 抓取数据，保存文件
-        blockCrawlAndSave(sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
-                          blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
+        bccTasks.append(
+            gevent.spawn(
+                blockCrawlAndSave, sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
+                blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流"
+            )
+        )
+
+    gevent.joinall(bccTasks)
 
 
 def block_price_crawl(sync: bool):
@@ -106,6 +120,8 @@ def block_price_crawl(sync: bool):
         myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
+    bpcTasks = []  # 任务列表
+
     for blockInfo in blockList:
         blockPayload = QueryPayload(klt="101", fqt="1", end="20500101", lmt="250",
                                     secid="90." + blockInfo['f12'],
@@ -120,5 +136,10 @@ def block_price_crawl(sync: bool):
         )
 
         # 抓取数据，保存文件
-        blockCrawlAndSave(sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
-                          blockModel=BlockPriceHistory, file_path="板块价格K线数据")
+        bpcTasks.append(
+            gevent.spawn(
+                blockCrawlAndSave, sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
+                blockModel=BlockPriceHistory, file_path="板块价格K线数据"
+            )
+        )
+    gevent.joinall(bpcTasks)

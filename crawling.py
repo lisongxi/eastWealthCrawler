@@ -37,5 +37,5 @@ def crawler():
 
     # 保存之后执行都是默认 增量同步
     with open(__SYNC_PATH__, 'w', encoding='utf-8') as f2:
-        s = {"sync": False}
+        s = {"sync": True}
         json.dump(s, f2)

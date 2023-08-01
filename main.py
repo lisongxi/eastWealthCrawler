@@ -1,13 +1,20 @@
 """
 爬取东方财富网的股票数据
 """
+from datetime import datetime
 
 from crawling import crawler
 from function import saveDate
 
 if __name__ == "__main__":
+    start = datetime.now()  # 开始时间
+
     # 爬取数据
     crawler()
+
+    end = datetime.now()  # 结束时间
+
+    print(f"总耗时{(end - start).seconds}秒")
 
     # 保存同步时间
     saveDate()
