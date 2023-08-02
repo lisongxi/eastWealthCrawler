@@ -10,6 +10,7 @@ if __name__ == "__main__":
     start = datetime.now()  # 开始时间
 
     # 爬取数据
+    # 已把爬取个股的函数注释掉了，因为数量太多了，如有需要可以自行去掉注释。
     crawler()
 
     end = datetime.now()  # 结束时间

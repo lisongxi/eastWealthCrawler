@@ -73,6 +73,7 @@ def get_result_dict(model, code: str, name: str, data: str, sync: bool) -> dict:
     attributes = data.split(",")
 
     if sync and judgeDate(attributes[0]):
+        # 判断增量全量、日期
         return {}
 
     attributes.insert(0, code)

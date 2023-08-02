@@ -23,7 +23,6 @@ def saveFile(myModel, file_path: str, file_data: dict, sync: bool):
         Name = file_data['data']['name']
 
         data = []
-
         for crawlData in reversed(file_data['data']['klines']):
             result = get_result_dict(model=myModel, code=Code, name=Name, data=crawlData, sync=sync)
             if not result:
@@ -69,7 +68,7 @@ def to_DB(DB_Model, file_path: str, sync: bool):
                 data = json.load(f)
 
             with mysql1.atomic():
-                for i in range(0, len(data), num := 100):  # 一次插入100条
+                for i in range(0, len(data), num := 1000):  # 一次插入1000条
                     (DB_Model
                      .insert_many([dict(flow) for flow in data[i: i + num]])
                      .execute()

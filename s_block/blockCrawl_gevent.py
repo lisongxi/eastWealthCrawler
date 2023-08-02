@@ -1,6 +1,8 @@
 """股票板块相关
 使用gevent库进行并发
 """
+import time
+
 import gevent
 from gevent import monkey
 
@@ -121,25 +123,29 @@ def block_price_crawl(sync: bool):
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
     bpcTasks = []  # 任务列表
+    length = len(blockList)
+    num = 50  # 放50个协程抓手，不要太多
 
-    for blockInfo in blockList:
-        blockPayload = QueryPayload(klt="101", fqt="1", end="20500101", lmt="250",
-                                    secid="90." + blockInfo['f12'],
-                                    fields1="f1,f2,f3,f4,f5,f6",
-                                    fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61").getDict()
+    for i in range(0, length, num):
+        for blockInfo in blockList[i:i + num]:
+            blockPayload = QueryPayload(klt="101", fqt="1", end="20500101", lmt="250",
+                                        secid="90." + blockInfo['f12'],
+                                        fields1="f1,f2,f3,f4,f5,f6",
+                                        fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61").getDict()
 
-        # 板块价格链接
-        blockPUrl = URL.build(
-            scheme='https',
-            host=URLs.h_StockUrl,
-            path='/kline/get'
-        )
-
-        # 抓取数据，保存文件
-        bpcTasks.append(
-            gevent.spawn(
-                blockCrawlAndSave, sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
-                blockModel=BlockPriceHistory, file_path="板块价格K线数据"
+            # 板块价格链接
+            blockPUrl = URL.build(
+                scheme='https',
+                host=URLs.h_StockUrl,
+                path='/kline/get'
             )
-        )
-    gevent.joinall(bpcTasks)
+
+            # 抓取数据，保存文件
+            bpcTasks.append(
+                gevent.spawn(
+                    blockCrawlAndSave, sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
+                    blockModel=BlockPriceHistory, file_path="板块价格K线数据"
+                )
+            )
+        gevent.joinall(bpcTasks)
+        time.sleep(2)

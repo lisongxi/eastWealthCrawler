@@ -29,3 +29,8 @@ class SaveFileError(Error):
 class ToDataBaseError(Error):
     """写入数据库错误
     """
+
+
+class RequestStockError(Error):
+    """获取个股错误
+    """

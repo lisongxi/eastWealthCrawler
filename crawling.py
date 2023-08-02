@@ -6,6 +6,8 @@ from dataProcessor import to_DB
 
 from s_block.blockCrawl import block_cf_crawl, block_price_crawl
 from s_block.blockDM import BlockPriceHistory, BlockCFHistory
+from s_stock.stockCrawl import crawlStockKline
+from s_stock.stockDM import StockKline
 
 __SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
 __ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
@@ -30,10 +32,12 @@ def crawler():
 
     block_cf_crawl(sync=sync)  # 爬取板块资金流历史数据
     block_price_crawl(sync=sync)  # 爬取板块价格K线图数据
+    # crawlStockKline(sync=sync)  # 个股K线数据
 
     # 保存到数据库
     to_DB(DB_Model=BlockCFHistory, file_path='板块历史资金流/', sync=sync)
     to_DB(DB_Model=BlockPriceHistory, file_path='板块价格K线数据/', sync=sync)
+    # to_DB(DB_Model=StockKline, file_path='个股K线数据/', sync=sync)
 
     # 保存之后执行都是默认 增量同步
     with open(__SYNC_PATH__, 'w', encoding='utf-8') as f2:

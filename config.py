@@ -109,6 +109,9 @@ class QueryPayload(BasePayloadModel):
     klt: str = None
     fqt: str = None
     end: str = None
+    fltt: int = None
+    invt: int = None
+    wbp2u: str = None
     secid: str = None
     fields: str = None
     fields1: str = None
