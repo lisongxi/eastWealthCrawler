@@ -11,11 +11,14 @@
 > 创建`eastwealthcrawler`MySQL数据库
 > 
 > 用户密码在`settings.ymal`文件里面修改
+>
 
 ### 2，启动
 > `main.py` ，直接运行
 > 
 > `scheduler.py` ，可执行定时任务 
+
+##  !!! 特别注意 settings 下的 date.json 和 sync.json ，这两个决定了数据库 写入日期 和 增量 全量 同步方式 。
 
 ## 结果
 
