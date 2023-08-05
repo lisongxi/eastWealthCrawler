@@ -30,7 +30,7 @@
 
 5000多个股票历史数据（每个股票大概1000行，总共四百多万行）
 
-![img_2.png](./assets/img/img_3.png)
+![img_3.png](./assets/img/img_3.png)
 
 # 补充
 > `s_block`包下面有一个`blockCrawl_gevent`的文件，利用了 `gevent` 库进行高并发爬取数据。但是我并不提倡高并发爬虫，这对目标网站不友好。
