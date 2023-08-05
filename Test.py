@@ -1,3 +1,2 @@
-from s_stock.stockCrawl import crawlStockKline
-
-crawlStockKline(False)
+for i in range(0,0):
+    print(i)
