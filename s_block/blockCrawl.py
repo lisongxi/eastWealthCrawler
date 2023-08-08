@@ -2,6 +2,8 @@
 """
 from yarl import URL
 import requests
+import aiohttp
+import asyncio
 
 from s_block.blockVD import BlockCapitalFlowHistory, BlockPriceHistory
 from config import URLs, Headers, QueryPayload, get_settings, CrawlStatus
@@ -28,15 +30,15 @@ def get_BlockInfo() -> list:
                                fields="f12,f14",
                                fid="f62",
                                fs="m:90+t:2").getDict()
-        blockInfoResp = resp_to_dict(
-            requests.get(url=str(blockUrl), params=payload, headers=Headers.headers))
+        content = requests.get(url=str(blockUrl), params=payload, headers=Headers.headers).text
+        blockInfoResp = resp_to_dict(content)
 
         return blockInfoResp['data']['diff']
     except Exception as err:
         raise RequestBlockError(err)
 
 
-def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel, file_path: str):
+async def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel, file_path: str):
     """爬取板块数据,保存文件
     Args:
         sync: 增量同步（True) , 全量同步（False）
@@ -45,10 +47,13 @@ def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel,
         blockModel: 板块数据模型
         file_path: 文件保存路径
     """
+    session = aiohttp.ClientSession()
     # 发起请求
-    response = requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers)
+    response = await session.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers)
+    content = await response.text()
+    await session.close()
 
-    blockResp = resp_to_dict(response)
+    blockResp = resp_to_dict(content)
 
     if blockResp:
         try:
@@ -72,6 +77,8 @@ def block_cf_crawl(sync: bool):
         myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
+    tasks = []  # 任务列表
+
     for blockInfo in blockList:
         blockCFPayload = QueryPayload(lmt="0",
                                       klt="101",
@@ -88,8 +95,15 @@ def block_cf_crawl(sync: bool):
         )
 
         # 抓取数据，保存文件
-        blockCrawlAndSave(sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
-                          blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
+        task = asyncio.ensure_future(
+            blockCrawlAndSave(sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
+                              blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
+        )
+        tasks.append(task)
+
+    if tasks:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.wait(tasks))
 
 
 def block_price_crawl(sync: bool):
@@ -106,6 +120,8 @@ def block_price_crawl(sync: bool):
         myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
+    tasks = []  # 任务列表
+
     for blockInfo in blockList:
         blockPayload = QueryPayload(klt="101", fqt="1", end="20500101", lmt="250",
                                     secid="90." + blockInfo['f12'],
@@ -120,5 +136,12 @@ def block_price_crawl(sync: bool):
         )
 
         # 抓取数据，保存文件
-        blockCrawlAndSave(sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
-                          blockModel=BlockPriceHistory, file_path="板块价格K线数据")
+        task = asyncio.ensure_future(
+            blockCrawlAndSave(sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
+                              blockModel=BlockPriceHistory, file_path="板块价格K线数据")
+        )
+        tasks.append(task)
+
+    if tasks:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.wait(tasks))

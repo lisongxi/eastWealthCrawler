@@ -3,6 +3,8 @@
 """
 import requests
 from yarl import URL
+import aiohttp
+import asyncio
 
 from config import URLs, QueryPayload, Headers, get_settings, CrawlStatus
 from s_block.blockVD import resp_to_dict
@@ -30,8 +32,8 @@ def get_StockInfo() -> list:
                                fields="f12",
                                fid="f20",
                                fs="m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048").getDict()
-        stockInfoResp = resp_to_dict(
-            requests.get(url=str(stockUrl), params=payload, headers=Headers.headers))
+        content = requests.get(url=str(stockUrl), params=payload, headers=Headers.headers).text
+        stockInfoResp = resp_to_dict(content)
 
         return stockInfoResp['data']['diff']
     except Exception as err:
@@ -68,6 +70,8 @@ def crawlStockKline(sync: bool):
         myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
         myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
 
+    tasks = []  # 任务列表
+
     for stock in stockList:
         stockCode = stock["f12"]
 
@@ -81,16 +85,27 @@ def crawlStockKline(sync: bool):
                                end="20500101", lmt="1000"
                                ).getDict()
 
-        stockCrawlAndSave(sync=sync, stockUrl=stockUrl, stockPayload=payload, stockModel=StockKlineVD,
-                          file_path="个股K线数据")
+        task = asyncio.ensure_future(
+            stockCrawlAndSave(sync=sync, stockUrl=stockUrl, stockPayload=payload, stockModel=StockKlineVD,
+                              file_path="个股K线数据")
+        )
+        tasks.append(task)
+
+    if tasks:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.wait(tasks))
 
 
-def stockCrawlAndSave(sync: bool, stockUrl: URL, stockPayload: dict, stockModel, file_path: str) -> None:
+async def stockCrawlAndSave(sync: bool, stockUrl: URL, stockPayload: dict, stockModel, file_path: str) -> None:
     """
     爬取个股数据，并写入数据库
     """
-    response = requests.get(url=str(stockUrl), params=stockPayload, headers=Headers.headers)
-    stockResp = resp_to_dict(response)
+    session = aiohttp.ClientSession()
+    response = await session.get(url=str(stockUrl), params=stockPayload, headers=Headers.headers)
+    content = await response.text()
+    await session.close()
+
+    stockResp = resp_to_dict(content)
 
     if stockResp:
         try:

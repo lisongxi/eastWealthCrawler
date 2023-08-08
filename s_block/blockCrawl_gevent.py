@@ -35,8 +35,8 @@ def get_BlockInfo() -> list:
                                fields="f12,f14",
                                fid="f62",
                                fs="m:90+t:2").getDict()
-        blockInfoResp = resp_to_dict(
-            requests.get(url=str(blockUrl), params=payload, headers=Headers.headers))
+        content = requests.get(url=str(blockUrl), params=payload, headers=Headers.headers).text
+        blockInfoResp = resp_to_dict(content)
 
         return blockInfoResp['data']['diff']
     except Exception as err:
@@ -54,7 +54,7 @@ def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel,
     """
 
     # 发起请求
-    response = requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers)
+    response = requests.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers).text
 
     blockResp = resp_to_dict(response)
 
