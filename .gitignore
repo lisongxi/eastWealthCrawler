@@ -1,5 +1,8 @@
 data/
 .idea/
 settings/
+.python-version
+.vscode/
+logs/*
 Test.py
 __pycache__/
