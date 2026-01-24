@@ -2,13 +2,22 @@ sysAdmin: superAdmin
 log:
   freq: day
   useUTC: false
+sync:
+  mode: full  # incremental (增量) or full (全量)
+  incremental_time: "20:00"  # 增量同步的时间，格式：HH:MM
+  start_date: "2019-01-01"  # 数据开始日期，格式：YYYY-MM-DD
+  # 令牌桶限流配置
+  rate_limit:
+    enabled: true  # 是否启用令牌桶限流
+    bucket_size: 1  # 桶的大小（同时最大并发请求数）
+    refill_rate: 0.1  # 令牌发放速率（每秒发放的令牌数），0.2表示每5秒发放1个令牌
 eastWealth:
   user:
-    username: 1
-    password: 1
+    username: "1"
+    password: "1"
   mysql:
     database: eastwealthcrawler
     host: 127.0.0.1
     port: 3306
     user: root
-    password: 778699
+    password: "a778699"
