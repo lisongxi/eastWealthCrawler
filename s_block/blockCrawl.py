@@ -1,147 +1,299 @@
-"""股票板块相关
+"""股票板块相关 / Stock Sector Related
+只保留完整模式需要的函数
 """
-from yarl import URL
+
 import requests
-import aiohttp
-import asyncio
-
-from s_block.blockVD import BlockCapitalFlowHistory, BlockPriceHistory
-from config import URLs, Headers, QueryPayload, get_settings, CrawlStatus
-from s_block.blockVD import resp_to_dict
-from errors import RequestBlockError, SaveFileError
-from log import LogType, Log
-from dataProcessor import saveFile
-
-__SUCCESS_LOG_PATH__ = './logs/success'  # 爬取成功日志
-__ERROR_LOG_PATH__ = './logs/errors'  # 错误日志
-
-globalSettings = get_settings()  # 获取配置信息
+import json
+import re
+from settings.settings import load_settings
 
 
-def get_BlockInfo() -> list:
-    """查询股票板块信息
-    """
-    try:
-        blockUrl = URL().build(
-            scheme='https',
-            host=URLs.t_StockUrl
-        )
-        payload = QueryPayload(pz=500, po=1, pn=1, np=1,
-                               fields="f12,f14",
-                               fid="f62",
-                               fs="m:90+t:2").getDict()
-        content = requests.get(url=str(blockUrl), params=payload, headers=Headers.headers).text
-        blockInfoResp = resp_to_dict(content)
-
-        return blockInfoResp['data']['diff']
-    except Exception as err:
-        raise RequestBlockError(err)
-
-
-async def blockCrawlAndSave(sync: bool, blockUrl: str, blockPayload: dict, blockModel, file_path: str):
-    """爬取板块数据,保存文件
+def get_block_list_db(limit=None):
+    """获取板块列表（用于数据库存储）
     Args:
-        sync: 增量同步（True) , 全量同步（False）
-        blockUrl: 板块链接
-        blockPayload: 请求参数
-        blockModel: 板块数据模型
-        file_path: 文件保存路径
+        limit: 获取板块数量限制，None表示不限制
+    Returns:
+        板块列表，每个元素包含 code 和 name
     """
-    session = aiohttp.ClientSession()
-    # 发起请求
-    response = await session.get(url=str(blockUrl), params=blockPayload, headers=Headers.headers)
-    content = await response.text()
-    await session.close()
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
 
-    blockResp = resp_to_dict(content)
+    # 使用概念板块
+    params = {
+        "np": 1,
+        "fltt": 1,
+        "invt": 2,
+        "fs": "m:90+t:2+f:!50",  # 概念板块，排除ST
+        "fields": "f12,f13,f14,f1,f2,f4,f3,f152,f20,f8,f104,f105,f128,f140,f141,f207,f208,f209,f136,f222",
+        "fid": "f3",
+        "pn": 1,
+        "pz": limit if limit else 500,  # 默认为500，足够获取所有板块
+        "po": 1,
+        "dect": 1,
+        "ut": "fa5fd1943c7b386f172d6893dbfba10b",
+        "wbp2u": "|0|0|0|web",
+    }
 
-    if blockResp:
+    headers = {
+        "Accept": "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Connection": "keep-alive",
+        "Referer": "https://quote.eastmoney.com/center/gridlist.html",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+    }
+
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+
+        if data.get("data") and data["data"].get("diff"):
+            blocks = []
+            for item in data["data"]["diff"]:
+                block_info = {
+                    "code": item.get("f12", ""),
+                    "name": item.get("f14", ""),
+                }
+                blocks.append(block_info)
+
+            print(f"成功获取 {len(blocks)} 个板块信息")
+            return blocks
+        else:
+            print("未获取到板块数据")
+            return []
+
+    except Exception as e:
+        print(f"获取板块列表失败: {e}")
+        return []
+
+
+def get_block_kline_db(block_code: str, block_name: str, start_date: str = ""):
+    """获取板块价格K线数据（用于数据库存储）
+    使用JSONP格式请求
+    Args:
+        block_code: 板块代码
+        block_name: 板块名称
+        start_date: 开始日期（可选，默认从配置读取）
+    Returns:
+        价格K线数据列表
+    """
+    import time
+
+    url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+
+    # 从配置文件读取开始日期（如果未提供）
+    if not start_date:
+        settings = load_settings()
+        start_date = settings.sync.start_date
+    
+    # 将日期格式转换为YYYYMMDD格式
+    start_date_str = start_date.replace("-", "")
+
+    # 生成唯一的callback名称
+    cb = f"jQuery{int(time.time()*1000)}"
+
+    params = {
+        "cb": cb,
+        "secid": f"90.{block_code}",
+        "fields1": "f1,f2,f3,f4,f5,f6",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+        "klt": "101",  # 日K
+        "fqt": "1",  # 前复权
+        "beg": start_date_str,
+        "end": "20500101",
+        "lmt": "1000000",
+        "ut": "fa5fd1943c7b386f172d6893dbfba10b",
+    }
+
+    headers = {
+        "Accept": "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Connection": "keep-alive",
+        "Referer": f"https://quote.eastmoney.com/bk/90.{block_code}.html",
+        "Sec-Fetch-Dest": "script",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "same-site",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+        "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+    }
+
+    cookies = {
+        "qgqp_b_id": "05ae85b295694ce66917993d6f23e369",
+        "st_nvi": "qd1JRLiNe_E2OF2IDNadqdda0",
+        "nid18": "091896bda237c70325347f0441ca596c",
+        "nid18_create_time": "1768113730542",
+        "gviem": "hRqVDs4tspISE7xEoGjQFb1a9",
+        "gviem_create_time": "1768113730542",
+        "st_si": "70276712164160",
+        "websitepoptg_api_time": "1775372773146",
+        "fullscreengg": "1",
+        "fullscreengg2": "1",
+        "st_pvi": "89090147348376",
+        "st_sp": "2026-01-11 14:42:10",
+        "st_inirUrl": "https://cn.bing.com/",
+        "st_sn": "10",
+        "st_psi": "20260405152406815-113200301353-1796905289",
+        "st_asi": "20260405152406815-113200301353-1796905289-hqzx.hsjAghqdy.dtt.lcKx-1",
+    }
+
+    try:
+        response = requests.get(
+            url, params=params, headers=headers, cookies=cookies, timeout=30
+        )
+
+        # 解析JSONP，提取纯JSON
+        text = response.text
+        match = re.search(r"\((.*)\)", text, re.S)
+        if match:
+            data = json.loads(match.group(1))
+        else:
+            data = response.json()
+
+        if data.get("data") and data["data"].get("klines"):
+            klines = data["data"]["klines"]
+            print(
+                f"  成功获取板块 {block_name} ({block_code}) 的价格K线数据: {len(klines)} 条"
+            )
+            return klines
+        else:
+            print(f"  板块 {block_name} ({block_code}) 没有价格K线数据")
+            return []
+
+    except Exception as e:
+        print(f"  获取板块 {block_name} ({block_code}) 的价格K线数据失败: {e}")
+        return []
+
+
+def get_block_capital_flow_db(block_code, block_name):
+    """获取板块资金流数据（用于数据库存储）
+    Args:
+        block_code: 板块代码
+        block_name: 板块名称
+    Returns:
+        资金流数据列表
+    """
+    url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
+
+    params = {
+        "secid": f"90.{block_code}",
+        "fields1": "f1,f2,f3,f4,f5,f6,f7",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63",
+        "klt": "101",  # 日K
+        "lmt": "1000000",  # 不限制数量
+        "beg": "19900101",
+        "end": "20500101",
+        "ut": "fa5fd1943c7b386f172d6893dbfba10b",
+    }
+
+    headers = {
+        "Accept": "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Connection": "keep-alive",
+        "Referer": f"https://quote.eastmoney.com/bk/90.{block_code}.html",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+    }
+
+    max_retries = 3
+    for attempt in range(max_retries):
         try:
-            saveFile(myModel=blockModel, file_path=file_path, file_data=blockResp, sync=sync)
-        except SaveFileError as err:
-            sfLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
-            sfLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
+            response = requests.get(url, params=params, headers=headers, timeout=30)
+            data = response.json()
+
+            if data.get("data") and data["data"].get("klines"):
+                klines = data["data"]["klines"]
+                print(
+                    f"  成功获取板块 {block_name} ({block_code}) 的资金流数据: {len(klines)} 条"
+                )
+                return klines
+            else:
+                print(f"  板块 {block_name} ({block_code}) 没有资金流数据")
+                return []
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(2)
+                continue
+            print(f"  获取板块 {block_name} ({block_code}) 的资金流数据失败: {e}")
+            return []
 
 
-def block_cf_crawl(sync: bool):
-    """爬取板块历史资金流
+def parse_block_price_kline(kline_str, block_code, block_name):
+    """解析板块价格K线数据 / Parse sector price K-line data
     Args:
-        sync: 增量同步（True) , 全量同步（False）
+        kline_str: K线数据字符串
+        block_code: 板块代码
+        block_name: 板块名称
+    Returns:
+        解析后的数据字典
     """
-    print(CrawlStatus.crawling.value)
-
     try:
-        blockList = get_BlockInfo()
-    except RequestBlockError as err:
-        blockList = []  # 获取板块列表失败
-        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
-        myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
+        # K线数据格式：日期,开盘,收盘,最高,最低,成交量,成交额,振幅,涨跌幅,涨跌额,换手率
+        parts = kline_str.split(",")
 
-    tasks = []  # 任务列表
+        if len(parts) >= 11:
+            return {
+                "b_date": parts[0],
+                "open_price": float(parts[1]) if parts[1] else 0,
+                "close_price": float(parts[2]) if parts[2] else 0,
+                "top_price": float(parts[3]) if parts[3] else 0,
+                "low_price": float(parts[4]) if parts[4] else 0,
+                "turnover": float(parts[5]) if parts[5] else 0,
+                "transaction": float(parts[6]) if parts[6] else 0,
+                "amplitude": float(parts[7]) if parts[7] else 0,
+                "quote_change": float(parts[8]) if parts[8] else 0,
+                "change_amount": float(parts[9]) if parts[9] else 0,
+                "turnover_rate": float(parts[10]) if parts[10] else 0,
+                "block_code": block_code,
+                "block_name": block_name,
+            }
+    except Exception as e:
+        print(f"解析K线数据失败: {e}, 数据: {kline_str}")
 
-    for blockInfo in blockList:
-        blockCFPayload = QueryPayload(lmt="0",
-                                      klt="101",
-                                      secid="90." + blockInfo['f12'],
-                                      fields1="f1,f2,f3,f7",
-                                      fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63"
-                                      ).getDict()
-
-        # 板块历史资金流链接
-        blockCFHUrl = URL.build(
-            scheme='https',
-            host=URLs.h_StockUrl,
-            path='/fflow/daykline/get'
-        )
-
-        # 抓取数据，保存文件
-        task = asyncio.ensure_future(
-            blockCrawlAndSave(sync=sync, blockUrl=str(blockCFHUrl), blockPayload=blockCFPayload,
-                              blockModel=BlockCapitalFlowHistory, file_path="板块历史资金流")
-        )
-        tasks.append(task)
-
-    if tasks:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.wait(tasks))
+    return None
 
 
-def block_price_crawl(sync: bool):
-    """爬取板块历史价格K线图数据
+def parse_block_capital_flow(kline_str, block_code, block_name):
+    """解析板块资金流数据 / Parse sector capital flow data
     Args:
-        sync: 增量同步（True) , 全量同步（False）
+        kline_str: 资金流数据字符串
+        block_code: 板块代码
+        block_name: 板块名称
+    Returns:
+        解析后的数据字典
     """
-    print(CrawlStatus.crawling.value)
-
     try:
-        blockList = get_BlockInfo()
-    except RequestBlockError as err:
-        blockList = []  # 获取板块列表失败
-        myLog = Log(path=__ERROR_LOG_PATH__, logType=LogType.run_error)
-        myLog.add_txt_row(username=globalSettings.sysAdmin, content=err)
+        # 资金流数据格式（根据实际API返回）：
+        # 日期,超大单净流入,大单净流入,中单净流入,小单净流入,?,涨跌幅,?,?,?,?,收盘价,?
+        parts = kline_str.split(",")
 
-    tasks = []  # 任务列表
+        if len(parts) >= 12:
+            return {
+                "b_date": parts[0],
+                "d_closing_price": (
+                    float(parts[11]) if len(parts) > 11 and parts[11] else 0
+                ),
+                "d_quote_change": float(parts[6]) if len(parts) > 6 and parts[6] else 0,
+                "main_net_inflow": (
+                    float(parts[1]) if len(parts) > 1 and parts[1] else 0
+                ),
+                "super_large_net_inflow": 0,  # API不单独提供
+                "large_net_inflow": (
+                    float(parts[2]) if len(parts) > 2 and parts[2] else 0
+                ),
+                "mid_net_inflow": float(parts[3]) if len(parts) > 3 and parts[3] else 0,
+                "small_net_inflow": (
+                    float(parts[4]) if len(parts) > 4 and parts[4] else 0
+                ),
+                "main_net_proportion": 0,
+                "large_net_proportion": 0,
+                "mid_net_proportion": 0,
+                "small_net_proportion": 0,
+                "super_large_net_proportion": 0,
+                "block_code": block_code,
+                "block_name": block_name,
+            }
+    except Exception as e:
+        print(f"解析资金流数据失败: {e}, 数据: {kline_str}")
 
-    for blockInfo in blockList:
-        blockPayload = QueryPayload(klt="101", fqt="1", end="20500101", lmt="250",
-                                    secid="90." + blockInfo['f12'],
-                                    fields1="f1,f2,f3,f4,f5,f6",
-                                    fields2="f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61").getDict()
-
-        # 板块价格链接
-        blockPUrl = URL.build(
-            scheme='https',
-            host=URLs.h_StockUrl,
-            path='/kline/get'
-        )
-
-        # 抓取数据，保存文件
-        task = asyncio.ensure_future(
-            blockCrawlAndSave(sync=sync, blockUrl=str(blockPUrl), blockPayload=blockPayload,
-                              blockModel=BlockPriceHistory, file_path="板块价格K线数据")
-        )
-        tasks.append(task)
-
-    if tasks:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.wait(tasks))
+    return None
