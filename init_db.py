@@ -4,7 +4,8 @@
 """
 
 import pymysql
-from database import init_db, create_tables, close_db, mysql1
+
+from database import close_db, create_tables, init_db, mysql1
 from settings.settings import get_settings
 
 

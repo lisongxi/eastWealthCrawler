@@ -3,7 +3,9 @@
 """
 
 from datetime import datetime
+
 from peewee import MySQLDatabase
+
 from settings.settings import get_settings
 
 # 获取配置信息
@@ -40,14 +42,23 @@ def close_db():
 def create_tables():
     """创建所有数据表"""
     from s_block.blockDM import BlockCapitalFlow, BlockKline
-    from s_stock.stockDM import StockKline
     from s_block.blockInfo import BlockInfo
-    from s_stock.stockInfo import StockInfo
     from s_common.task import CrawlTask
+    from s_stock.stockDM import StockKline
+    from s_stock.stockInfo import StockInfo
 
     try:
         with mysql1:
-            mysql1.create_tables([BlockCapitalFlow, BlockKline, StockKline, BlockInfo, StockInfo, CrawlTask])
+            mysql1.create_tables(
+                [
+                    BlockCapitalFlow,
+                    BlockKline,
+                    StockKline,
+                    BlockInfo,
+                    StockInfo,
+                    CrawlTask,
+                ]
+            )
             print("所有数据表创建成功")
             return True
     except Exception as e:
@@ -58,10 +69,10 @@ def create_tables():
 def ensure_tables_exist():
     """检查表是否存在，不存在则创建（增量模式用）"""
     from s_block.blockDM import BlockCapitalFlow, BlockKline
-    from s_stock.stockDM import StockKline
     from s_block.blockInfo import BlockInfo
-    from s_stock.stockInfo import StockInfo
     from s_common.task import CrawlTask
+    from s_stock.stockDM import StockKline
+    from s_stock.stockInfo import StockInfo
 
     tables = [BlockCapitalFlow, BlockKline, StockKline, BlockInfo, StockInfo, CrawlTask]
     try:
@@ -100,8 +111,10 @@ def ensure_info_tables():
 
 def update_block_info():
     """更新板块基本信息表"""
-    import requests
     from datetime import datetime
+
+    import requests
+
     from s_block.blockInfo import BlockInfo
 
     url = "https://push2.eastmoney.com/api/qt/clist/get"
@@ -119,7 +132,7 @@ def update_block_info():
 
         all_blocks = []
         page = 1
-        
+
         # 翻页获取所有板块
         while True:
             params = {
@@ -141,12 +154,15 @@ def update_block_info():
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    response = requests.get(url, params=params, headers=headers, timeout=30)
+                    response = requests.get(
+                        url, params=params, headers=headers, timeout=30
+                    )
                     data = response.json()
                     break
                 except Exception as e:
                     if attempt < max_retries - 1:
                         import time
+
                         time.sleep(2)
                         continue
                     raise
@@ -155,7 +171,7 @@ def update_block_info():
                 break
 
             all_blocks.extend(data["data"]["diff"])
-            
+
             # 检查是否还有更多页（每页100条）
             if len(data["data"]["diff"]) < 100:
                 break
@@ -167,10 +183,12 @@ def update_block_info():
 
         today = datetime.now().date()
         existing_codes = set()
-        
+
         # 获取现有板块代码
         with mysql1:
-            for block in BlockInfo.select(BlockInfo.block_code).where(BlockInfo.status == 1):
+            for block in BlockInfo.select(BlockInfo.block_code).where(
+                BlockInfo.status == 1
+            ):
                 existing_codes.add(block.block_code)
 
         new_codes = set()
@@ -180,7 +198,7 @@ def update_block_info():
             for item in all_blocks:
                 code = item.get("f12", "")
                 name = item.get("f14", "")
-                
+
                 if not code:
                     continue
 
@@ -202,17 +220,19 @@ def update_block_info():
 
                 # 新增或更新
                 if code not in existing_codes:
-                    blocks_to_insert.append(BlockInfo(
-                        block_code=code,
-                        block_name=name,
-                        block_type=block_type,
-                        hot_rank=hot_rank,
-                        current_price=current_price,
-                        change_pct=change_pct,
-                        status=1,
-                        created_at=today,
-                        updated_at=today,
-                    ))
+                    blocks_to_insert.append(
+                        BlockInfo(
+                            block_code=code,
+                            block_name=name,
+                            block_type=block_type,
+                            hot_rank=hot_rank,
+                            current_price=current_price,
+                            change_pct=change_pct,
+                            status=1,
+                            created_at=today,
+                            updated_at=today,
+                        )
+                    )
                 else:
                     # 更新
                     BlockInfo.update(
@@ -231,25 +251,29 @@ def update_block_info():
             # 将不存在的状态设为0
             if new_codes:
                 BlockInfo.update(status=0, updated_at=today).where(
-                    BlockInfo.status == 1,
-                    BlockInfo.block_code.not_in(new_codes)
+                    BlockInfo.status == 1, BlockInfo.block_code.not_in(new_codes)
                 ).execute()
 
-        print(f"板块信息更新完成: 新增 {len(blocks_to_insert)} 个, 共 {len(new_codes)} 个")
+        print(
+            f"板块信息更新完成: 新增 {len(blocks_to_insert)} 个, 共 {len(new_codes)} 个"
+        )
         return True
 
     except Exception as e:
         print(f"更新板块信息失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
 
 def update_stock_info():
     """更新个股基本信息表 - 支持翻页获取完整数据"""
-    import requests
     import time
     from datetime import datetime
+
+    import requests
+
     from s_stock.stockInfo import StockInfo
 
     url = "https://push2.eastmoney.com/api/qt/clist/get"
@@ -268,7 +292,7 @@ def update_stock_info():
         all_stocks = []
         page = 1
         max_pages = 20  # 最多20页，每页500条 = 10000条
-        
+
         # 翻页获取所有股票
         while page <= max_pages:
             params = {
@@ -289,7 +313,9 @@ def update_stock_info():
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    response = requests.get(url, params=params, headers=headers, timeout=30)
+                    response = requests.get(
+                        url, params=params, headers=headers, timeout=30
+                    )
                     data = response.json()
                     break
                 except Exception as e:
@@ -317,10 +343,12 @@ def update_stock_info():
 
         today = datetime.now().date()
         existing_codes = set()
-        
+
         # 获取现有股票代码
         with mysql1:
-            for stock in StockInfo.select(StockInfo.stock_code).where(StockInfo.status == 1):
+            for stock in StockInfo.select(StockInfo.stock_code).where(
+                StockInfo.status == 1
+            ):
                 existing_codes.add(stock.stock_code)
 
         new_codes = set()
@@ -330,7 +358,7 @@ def update_stock_info():
             for item in all_stocks:
                 code = item.get("f12", "")
                 name = item.get("f14", "")
-                
+
                 if not code:
                     continue
 
@@ -354,16 +382,18 @@ def update_stock_info():
 
                 # 新增或更新
                 if code not in existing_codes:
-                    stocks_to_insert.append(StockInfo(
-                        stock_code=code,
-                        stock_name=name,
-                        market=market,
-                        stock_type=stock_type,
-                        change_pct=change_pct,
-                        status=1,
-                        created_at=today,
-                        updated_at=today,
-                    ))
+                    stocks_to_insert.append(
+                        StockInfo(
+                            stock_code=code,
+                            stock_name=name,
+                            market=market,
+                            stock_type=stock_type,
+                            change_pct=change_pct,
+                            status=1,
+                            created_at=today,
+                            updated_at=today,
+                        )
+                    )
                 else:
                     # 更新
                     StockInfo.update(
@@ -381,16 +411,18 @@ def update_stock_info():
             # 将不存在的状态设为0
             if new_codes:
                 StockInfo.update(status=0, updated_at=today).where(
-                    StockInfo.status == 1,
-                    StockInfo.stock_code.not_in(new_codes)
+                    StockInfo.status == 1, StockInfo.stock_code.not_in(new_codes)
                 ).execute()
 
-        print(f"股票信息更新完成: 新增 {len(stocks_to_insert)} 个, 共 {len(new_codes)} 个")
+        print(
+            f"股票信息更新完成: 新增 {len(stocks_to_insert)} 个, 共 {len(new_codes)} 个"
+        )
         return True
 
     except Exception as e:
         print(f"更新股票信息失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -407,10 +439,12 @@ def get_block_list_from_db():
         blocks = []
         with mysql1:
             for block in BlockInfo.select().where(BlockInfo.status == 1):
-                blocks.append({
-                    "code": block.block_code,
-                    "name": block.block_name,
-                })
+                blocks.append(
+                    {
+                        "code": block.block_code,
+                        "name": block.block_name,
+                    }
+                )
         return blocks
     except Exception as e:
         print(f"获取板块列表失败: {e}")
@@ -429,16 +463,20 @@ def get_stock_list_from_db():
         stocks = []
         with mysql1:
             for stock in StockInfo.select().where(StockInfo.status == 1):
-                stocks.append({
-                    "code": stock.stock_code,
-                    "name": stock.stock_name,
-                })
+                stocks.append(
+                    {
+                        "code": stock.stock_code,
+                        "name": stock.stock_name,
+                    }
+                )
         return stocks
     except Exception as e:
         print(f"获取股票列表失败: {e}")
         return []
 
+
 # ========== 任务表操作函数 ==========
+
 
 def is_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
     """检查任务是否已完成"""
@@ -455,9 +493,9 @@ def is_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
             CrawlTask.task_type == task_type,
             CrawlTask.target_code == target_code,
             CrawlTask.mode_type == mode_type,
-            CrawlTask.status == "completed"
+            CrawlTask.status == "completed",
         )
-        
+
         task = query.first()
 
         return task is not None
@@ -468,15 +506,16 @@ def is_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
 
 def mark_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
     """标记任务已完成"""
-    from s_common.task import CrawlTask
     from datetime import datetime
+
+    from s_common.task import CrawlTask
 
     try:
         if mysql1.is_closed():
             mysql1.connect()
 
         today = datetime.now().date()
-        
+
         # 如果未指定mode_type，默认为"full"
         if not mode_type:
             mode_type = "full"
@@ -487,22 +526,19 @@ def mark_task_completed(task_type: str, target_code: str, mode_type: str) -> boo
                 CrawlTask.task_type == task_type,
                 CrawlTask.target_code == target_code,
             )
-            
+
             # 如果指定了mode_type，也需要匹配
             if mode_type:
                 query = query.where(CrawlTask.mode_type == mode_type)
-            
+
             existing = query.first()
 
             if existing:
                 # 更新状态
-                CrawlTask.update(
-                    status="completed",
-                    updated_at=today
-                ).where(
+                CrawlTask.update(status="completed", updated_at=today).where(
                     CrawlTask.task_type == task_type,
                     CrawlTask.target_code == target_code,
-                    CrawlTask.mode_type == mode_type
+                    CrawlTask.mode_type == mode_type,
                 ).execute()
             else:
                 # 插入新记录
@@ -532,15 +568,17 @@ def reset_task(target_code: str, task_type: str) -> bool:
         with mysql1:
             if task_type:
                 # 重置指定类型任务
-                CrawlTask.update(status="pending", updated_at=datetime.now().date()).where(
+                CrawlTask.update(
+                    status="pending", updated_at=datetime.now().date()
+                ).where(
                     CrawlTask.task_type == task_type,
-                    CrawlTask.target_code == target_code
+                    CrawlTask.target_code == target_code,
                 ).execute()
             else:
                 # 重置该目标所有任务
-                CrawlTask.update(status="pending", updated_at=datetime.now().date()).where(
-                    CrawlTask.target_code == target_code
-                ).execute()
+                CrawlTask.update(
+                    status="pending", updated_at=datetime.now().date()
+                ).where(CrawlTask.target_code == target_code).execute()
 
         return True
     except Exception as e:

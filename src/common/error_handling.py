@@ -2,13 +2,13 @@
 Unified Error Handling System
 """
 
-from typing import Optional, Dict, Any, List, Type, Callable
+import asyncio
 import logging
 import traceback
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
-import asyncio
+from typing import Any, Callable, Dict, List, Optional, Type
 
 
 class ErrorSeverity(Enum):

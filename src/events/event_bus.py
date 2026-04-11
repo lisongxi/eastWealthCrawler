@@ -3,13 +3,13 @@ Event Bus Implementation
 Event-driven architecture for decoupling components
 """
 
-from typing import List, Dict, Callable, Any, Type, Optional
-from datetime import datetime
-from dataclasses import dataclass
 import asyncio
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from functools import lru_cache
+from typing import Any, Callable, Dict, List, Optional, Type
 
 
 class EventType(Enum):

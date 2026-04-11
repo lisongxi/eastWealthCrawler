@@ -3,20 +3,20 @@
 允许使用不同的爬虫策略进行互换
 """
 
-from typing import List, Dict, Any, Optional
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from src.domain.entities import (
+    BlockIdentifier,
+    CapitalFlowData,
+    CrawlDataPoint,
     CrawlerConfiguration,
     CrawlResult,
     DataSourceType,
-    StockIdentifier,
-    BlockIdentifier,
     FinancialData,
-    CapitalFlowData,
-    CrawlDataPoint,
+    StockIdentifier,
 )
 
 
@@ -92,10 +92,10 @@ class BlockCrawlerStrategy(CrawlerStrategy):
     ) -> Optional[CrawlResult]:
         """爬取单个板块的真实数据"""
         from s_block.blockCrawl import (
-            get_block_kline_db,
             get_block_capital_flow_db,
-            parse_block_price_kline,
+            get_block_kline_db,
             parse_block_capital_flow,
+            parse_block_price_kline,
         )
 
         block_code = target["code"]
@@ -113,7 +113,9 @@ class BlockCrawlerStrategy(CrawlerStrategy):
                 # 获取板块资金流数据
                 klines = get_block_capital_flow_db(block_code, block_name)
                 if not klines:
-                    self.logger.warning(f"板块 {block_name} ({block_code}) 没有资金流数据")
+                    self.logger.warning(
+                        f"板块 {block_name} ({block_code}) 没有资金流数据"
+                    )
                     return None
 
                 for kline_str in klines:
@@ -281,9 +283,10 @@ class StockCrawlerStrategy(CrawlerStrategy):
         self, target: Dict[str, Any]
     ) -> Optional[CrawlResult]:
         """爬取单只股票的真实K线数据"""
-        import requests
-        import re
         import json
+        import re
+
+        import requests
 
         stock_code = target["code"]
         stock_name = target["name"]

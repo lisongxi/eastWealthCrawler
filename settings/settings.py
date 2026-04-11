@@ -2,10 +2,11 @@
 配置文件读取 / Configuration File Reading
 """
 
-import yaml
 from pathlib import Path
-from pydantic import BaseModel, Field
 from typing import Optional
+
+import yaml
+from pydantic import BaseModel, Field
 
 # 配置文件路径 / Configuration file path
 SETTINGS_FILE = Path(__file__).parent / "settings.yaml"

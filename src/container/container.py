@@ -3,12 +3,12 @@
 实现IoC模式用于管理组件依赖关系
 """
 
-from typing import Any, Dict, Type, Optional, Callable
-from functools import lru_cache
 import inspect
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
+from typing import Any, Callable, Dict, Optional, Type
 
 
 class ComponentScope(Enum):

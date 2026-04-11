@@ -3,14 +3,14 @@
 统一的数据处理管道，确保一致的数据流
 """
 
-from typing import List, Dict, Any, Callable, Union
+import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-import logging
 from enum import Enum
-from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Union
 
-from src.domain.entities import CrawlResult, CrawlDataPoint
+from src.domain.entities import CrawlDataPoint, CrawlResult
 
 
 class PipelineStepType(Enum):
@@ -101,7 +101,7 @@ class StorageHandler(PipelineStepHandler):
     """存储管道步骤 - 保存数据到数据库"""
 
     def __init__(self):
-        from database import mysql1, init_db
+        from database import init_db, mysql1
 
         self.db = mysql1
         self.logger = logging.getLogger(__name__)
