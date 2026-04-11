@@ -1,6 +1,5 @@
 data/
 .idea/
-settings/
 .python-version
 .vscode/
 logs/*
