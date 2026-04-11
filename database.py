@@ -176,6 +176,7 @@ def update_block_info():
             if len(data["data"]["diff"]) < 100:
                 break
             page += 1
+            time.sleep(10)  # 避免请求过快被限流
 
         if not all_blocks:
             print("获取板块列表失败")
@@ -297,7 +298,7 @@ def update_stock_info():
         while page <= max_pages:
             params = {
                 "pn": page,
-                "pz": 500,  # 每页500条
+                "pz": 100,  # 每页100条
                 "po": 1,
                 "np": 1,
                 "fltt": 2,
@@ -305,7 +306,7 @@ def update_stock_info():
                 "ut": "fa5fd1943c7b386f172d6893dbfba10b",
                 "wbp2u": "|0|0|0|web",
                 "fid": "f20",
-                "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81 s:2048",
+                "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81,m:1+t:80 s:2048",
                 "fields": "f12,f14,f13,f4",
             }
 
@@ -329,13 +330,13 @@ def update_stock_info():
 
             page_stocks = data["data"]["diff"]
             all_stocks.extend(page_stocks)
-            print(f"第 {page} 页: 获取 {len(page_stocks)} 条")
 
             # 检查是否还有更多页
-            if len(page_stocks) < 500:
+            if len(page_stocks) < 100:
                 break
             page += 1
-            time.sleep(0.5)  # 避免请求过快被限流
+            time.sleep(10)  # 避免请求过快被限流
+            print(f"已获取 {len(all_stocks)} 条股票数据, 正在处理第 {page} 页...")
 
         if not all_stocks:
             print("获取股票列表为空")
