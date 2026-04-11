@@ -2,9 +2,11 @@
 只保留完整模式需要的函数
 """
 
-import requests
 import json
 import re
+
+import requests
+
 from settings.settings import load_settings
 
 
@@ -83,12 +85,12 @@ def get_block_kline_db(block_code: str, block_name: str, start_date: str = ""):
     if not start_date:
         settings = load_settings()
         start_date = settings.sync.start_date
-    
+
     # 将日期格式转换为YYYYMMDD格式
     start_date_str = start_date.replace("-", "")
 
     # 生成唯一的callback名称
-    cb = f"jQuery{int(time.time()*1000)}"
+    cb = f"jQuery{int(time.time() * 1000)}"
 
     params = {
         "cb": cb,
@@ -212,6 +214,7 @@ def get_block_capital_flow_db(block_code, block_name):
         except Exception as e:
             if attempt < max_retries - 1:
                 import time
+
                 time.sleep(2)
                 continue
             print(f"  获取板块 {block_name} ({block_code}) 的资金流数据失败: {e}")

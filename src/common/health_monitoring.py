@@ -4,15 +4,16 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field
-from enum import Enum
-import time
-import psutil
 import platform
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
-from src.domain.entities import CrawlerStatus, CrawlerMetrics
+import psutil
+
+from src.domain.entities import CrawlerMetrics, CrawlerStatus
 from src.events.event_bus import EventBus, EventType
 
 

@@ -3,30 +3,29 @@
 支持并发爬取 + 令牌桶限流
 """
 
-from typing import List, Optional, Dict
-from datetime import timedelta, datetime
-import logging
 import asyncio
+import logging
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 from settings.settings import Settings
-
+from src.container.container import get_container
 from src.domain.entities import (
-    DataSourceType,
-    SyncType,
-    CrawlerStatus,
-    CrawlResult,
     CrawlerConfiguration,
     CrawlerEvent,
     CrawlerMetrics,
+    CrawlerStatus,
+    CrawlResult,
+    DataSourceType,
+    SyncType,
 )
-from src.container.container import get_container
 from src.events.event_bus import EventBus
 from src.pipeline.data_pipeline import DataPipeline
 
 # 导入令牌桶限流器
 try:
-    from src.common.rate_limiter import rate_limiter, init_rate_limiter
+    from src.common.rate_limiter import init_rate_limiter, rate_limiter
 
     RATE_LIMITER_AVAILABLE = True
 except ImportError:
@@ -61,21 +60,21 @@ class CrawlerService(ABC):
             await rate_limiter.acquire()
 
     def _publish_event(
-            self,
-            event_type: str,
-            status: CrawlerStatus,
-            message: Optional[str] = None,
-            data: Optional[Dict] = None,
-        ):
-            """发布爬虫事件"""
-            event = CrawlerEvent(
-                event_type=event_type,
-                crawler_id=self.__class__.__name__,
-                status=status,
-                message=message,
-                data=data,
-            )
-            self.event_bus.publish(event)
+        self,
+        event_type: str,
+        status: CrawlerStatus,
+        message: Optional[str] = None,
+        data: Optional[Dict] = None,
+    ):
+        """发布爬虫事件"""
+        event = CrawlerEvent(
+            event_type=event_type,
+            crawler_id=self.__class__.__name__,
+            status=status,
+            message=message,
+            data=data,
+        )
+        self.event_bus.publish(event)
 
     def _update_metrics(self, **kwargs):
         """更新爬虫指标"""
@@ -93,17 +92,15 @@ class CrawlerService(ABC):
 
     def _delete_stock_data(self, stock_code: str, source_type: DataSourceType):
         """删除股票数据（全量模式重新爬取前调用）"""
-        from s_stock.stockDM import StockKline
         from database import mysql1
+        from s_stock.stockDM import StockKline
 
         try:
             if mysql1.is_closed():
                 mysql1.connect()
 
             with mysql1:
-                StockKline.delete().where(
-                    StockKline.stock_code == stock_code
-                ).execute()
+                StockKline.delete().where(StockKline.stock_code == stock_code).execute()
                 self.logger.info(f"删除股票 {stock_code} K线数据")
         except Exception as e:
             self.logger.warning(f"删除股票数据失败: {e}")
@@ -127,6 +124,7 @@ class BlockCrawlerService(CrawlerService):
                 need_crawl = True
                 if config.sync_type == SyncType.FULL:
                     from database import is_task_completed
+
                     task_code = block["code"]
                     if config.source_type == DataSourceType.BLOCK_CAPITAL_FLOW:
                         task_type = "block_capital_flow"
@@ -134,11 +132,11 @@ class BlockCrawlerService(CrawlerService):
                         task_type = "block_kline"
                     else:
                         task_type = "unknown"
-                    
+
                     if is_task_completed(task_type, task_code, "full"):
                         self.logger.info(f"跳过已完成的任务: {task_type} - {task_code}")
                         need_crawl = False
-                
+
                 # 只有需要爬取才执行限流和爬取
                 if need_crawl:
                     # 令牌桶限流
@@ -180,12 +178,12 @@ class BlockCrawlerService(CrawlerService):
         from database import get_block_list_from_db
 
         blocks = get_block_list_from_db()
-        
+
         # 如果数据库有数据就直接使用
         if blocks:
             self.logger.info(f"从数据库获取 {len(blocks)} 个板块")
             return blocks
-        
+
         # 否则从API获取（备用方案）
         self.logger.info("从API获取板块列表...")
         import requests
@@ -229,8 +227,8 @@ class BlockCrawlerService(CrawlerService):
 
     def _get_latest_block_date(self, block_code: str) -> Optional[str]:
         """从数据库获取某板块的最新日期"""
-        from s_block.blockDM import BlockKline
         from database import mysql1
+        from s_block.blockDM import BlockKline
 
         try:
             if mysql1.is_closed():
@@ -251,8 +249,8 @@ class BlockCrawlerService(CrawlerService):
 
     def _delete_block_data(self, block_code: str, source_type: DataSourceType):
         """删除板块数据（全量模式重新爬取前调用）"""
-        from s_block.blockDM import BlockCapitalFlow, BlockKline
         from database import mysql1
+        from s_block.blockDM import BlockCapitalFlow, BlockKline
 
         try:
             if mysql1.is_closed():
@@ -274,17 +272,15 @@ class BlockCrawlerService(CrawlerService):
 
     def _delete_stock_data(self, stock_code: str, source_type: DataSourceType):
         """删除股票数据（全量模式重新爬取前调用）"""
-        from s_stock.stockDM import StockKline
         from database import mysql1
+        from s_stock.stockDM import StockKline
 
         try:
             if mysql1.is_closed():
                 mysql1.connect()
 
             with mysql1:
-                StockKline.delete().where(
-                    StockKline.stock_code == stock_code
-                ).execute()
+                StockKline.delete().where(StockKline.stock_code == stock_code).execute()
                 self.logger.info(f"删除股票 {stock_code} K线数据")
         except Exception as e:
             self.logger.warning(f"删除股票数据失败: {e}")
@@ -293,23 +289,24 @@ class BlockCrawlerService(CrawlerService):
         self, block: Dict, config: CrawlerConfiguration
     ) -> Optional[CrawlResult]:
         """为单个板块爬取数据"""
+        from datetime import datetime, timedelta
+
         from src.domain.entities import (
             BlockIdentifier,
+            CapitalFlowData,
             CrawlDataPoint,
             FinancialData,
-            CapitalFlowData,
         )
-        from datetime import datetime, timedelta
 
         identifier = BlockIdentifier(code=block["code"], name=block["name"])
 
         # 根据同步类型决定开始日期
-        from settings.settings import load_settings
         from database import is_task_completed, mark_task_completed
-        
+        from settings.settings import load_settings
+
         settings = load_settings()
         task_code = block["code"]
-        
+
         # 全量模式：检查任务是否已完成
         if config.sync_type == SyncType.FULL:
             # 确定任务类型
@@ -319,12 +316,12 @@ class BlockCrawlerService(CrawlerService):
                 task_type = "block_kline"
             else:
                 task_type = "unknown"
-            
+
             # 检查是否已完成（full模式）
             if is_task_completed(task_type, task_code, "full"):
                 self.logger.info(f"跳过已完成的任务: {task_type} - {task_code}")
                 return None
-            
+
             # 删除该板块的已有数据（重新爬取）
             self._delete_block_data(task_code, config.source_type)
 
@@ -345,10 +342,7 @@ class BlockCrawlerService(CrawlerService):
 
         if config.source_type == DataSourceType.BLOCK_KLINE:
             # 获取板块K线数据
-            from s_block.blockCrawl import (
-                get_block_kline_db,
-                parse_block_price_kline,
-            )
+            from s_block.blockCrawl import get_block_kline_db, parse_block_price_kline
 
             klines = get_block_kline_db(block["code"], block["name"], start_date)
 
@@ -391,9 +385,11 @@ class BlockCrawlerService(CrawlerService):
             # 获取资金流数据
             capital_klines = get_block_capital_flow_db(block["code"], block["name"])
             if not capital_klines:
-                self.logger.info(f"No capital flow data found for block: {block['name']}")
-                return None 
-            
+                self.logger.info(
+                    f"No capital flow data found for block: {block['name']}"
+                )
+                return None
+
             for kline_str in capital_klines:
                 parsed = parse_block_capital_flow(
                     kline_str, block["code"], block["name"]
@@ -503,13 +499,14 @@ class StockCrawlerService(CrawlerService):
                 need_crawl = True
                 if config.sync_type == SyncType.FULL:
                     from database import is_task_completed
+
                     task_code = stock["code"]
                     task_type = "stock_kline"
-                    
+
                     if is_task_completed(task_type, task_code, "full"):
                         self.logger.info(f"跳过已完成的任务: {task_type} - {task_code}")
                         need_crawl = False
-                
+
                 # 只有需要爬取才执行限流和爬取
                 if need_crawl:
                     # 令牌桶限流
@@ -551,12 +548,12 @@ class StockCrawlerService(CrawlerService):
         from database import get_stock_list_from_db
 
         stocks = get_stock_list_from_db()
-        
+
         # 如果数据库有数据就直接使用
         if stocks:
             self.logger.info(f"从数据库获取 {len(stocks)} 只股票")
             return stocks
-        
+
         # 否则从API获取（备用方案）
         self.logger.info("从API获取股票列表...")
         import requests
@@ -601,10 +598,12 @@ class StockCrawlerService(CrawlerService):
         self, stock: Dict, config: CrawlerConfiguration
     ) -> Optional[CrawlResult]:
         """为单只股票爬取真实K线数据"""
-        from src.domain.entities import StockIdentifier, CrawlDataPoint, FinancialData
-        import requests
-        import re
         import json
+        import re
+
+        import requests
+
+        from src.domain.entities import CrawlDataPoint, FinancialData, StockIdentifier
 
         stock_code = stock["code"]
         stock_name = stock["name"]
@@ -620,23 +619,24 @@ class StockCrawlerService(CrawlerService):
         identifier = StockIdentifier(code=stock_code, name=stock_name, secid=secid)
 
         # 根据同步类型决定开始日期
-        from settings.settings import load_settings
         from datetime import datetime, timedelta
+
         from database import is_task_completed, mark_task_completed
-        
+        from settings.settings import load_settings
+
         settings = load_settings()
         task_code = stock_code
-        
+
         # 全量模式：检查任务是否已完成
         if config.sync_type == SyncType.FULL:
             # 股票K线任务类型
             task_type = "stock_kline"
-            
+
             # 检查是否已完成（full模式）
             if is_task_completed(task_type, task_code, "full"):
                 self.logger.info(f"跳过已完成的任务: {task_type} - {task_code}")
                 return None
-            
+
             # 删除该股票的已有数据（重新爬取）
             self._delete_stock_data(task_code, config.source_type)
 
@@ -672,7 +672,7 @@ class StockCrawlerService(CrawlerService):
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": f'https://quote.eastmoney.com/{stock["code"]}.html',
+            "Referer": f"https://quote.eastmoney.com/{stock['code']}.html",
         }
 
         try:
@@ -758,8 +758,8 @@ class StockCrawlerService(CrawlerService):
 
     def _get_latest_date(self, stock_code: str) -> Optional[str]:
         """从数据库获取某只股票的最新日期"""
-        from s_stock.stockDM import StockKline
         from database import mysql1
+        from s_stock.stockDM import StockKline
 
         try:
             if mysql1.is_closed():

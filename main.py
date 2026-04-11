@@ -3,11 +3,11 @@
 使用事件驱动架构爬取股票数据
 """
 
-import logging
 import asyncio
+import logging
 from datetime import datetime, time, timedelta
 
-from src.common.error_handling import setup_error_handling, ErrorMiddleware
+from src.common.error_handling import ErrorMiddleware, setup_error_handling
 
 # 配置日志
 logging.basicConfig(
@@ -53,7 +53,7 @@ async def execute_crawler(crawler_orchestrator, error_handler):
         # 显示部分结果信息
         for i, result in enumerate(results[:3]):  # 显示前3条结果
             logger.info(
-                f"Result {i+1}: {result.source_type.value} - "
+                f"Result {i + 1}: {result.source_type.value} - "
                 f"{result.identifier.name} ({result.identifier.code}) - "
                 f"{len(result.data_points)} data points"
             )
@@ -75,13 +75,13 @@ async def execute_crawler(crawler_orchestrator, error_handler):
 
 async def main():
     """主应用程序入口点"""
-    from src.container.container import get_container
-    from src.events.event_bus import get_event_bus, LoggingEventHandler, EventBus
-    from src.pipeline.data_pipeline import DataPipeline, PipelineFactory
-    from src.application.services import CrawlerOrchestrator
-    from src.common.error_handling import setup_error_handling, ErrorMiddleware
-    from src.common.health_monitoring import HealthMonitor, HealthCheckScheduler
     from settings.settings import load_settings
+    from src.application.services import CrawlerOrchestrator
+    from src.common.error_handling import ErrorMiddleware, setup_error_handling
+    from src.common.health_monitoring import HealthCheckScheduler, HealthMonitor
+    from src.container.container import get_container
+    from src.events.event_bus import EventBus, LoggingEventHandler, get_event_bus
+    from src.pipeline.data_pipeline import DataPipeline, PipelineFactory
 
     logger.info("Starting East Money Stock Data Crawler")
 
@@ -92,10 +92,10 @@ async def main():
 
     # 根据模式初始化数据库
     from database import (
-        init_db,
-        ensure_tables_exist,
-        ensure_info_tables,
         close_db,
+        ensure_info_tables,
+        ensure_tables_exist,
+        init_db,
         update_block_info,
         update_stock_info,
     )
@@ -118,12 +118,12 @@ async def main():
         update_block_info()
     except Exception as e:
         logger.warning(f"更新板块信息失败: {e}")
-    
+
     try:
         update_stock_info()
     except Exception as e:
         logger.warning(f"更新股票信息失败: {e}")
-    
+
     close_db()
 
     # 初始化令牌桶限流器

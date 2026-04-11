@@ -1,7 +1,8 @@
 """个股数据库模型"""
 
+from peewee import BigAutoField, CharField, DateField, DecimalField, FloatField, Model
+
 from database import mysql1
-from peewee import Model, BigAutoField, CharField, DateField, FloatField, DecimalField
 
 
 # 个股历史K线数据模型

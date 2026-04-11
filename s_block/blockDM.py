@@ -1,13 +1,14 @@
-from database import mysql1
 from peewee import (
-    Model,
-    CompositeKey,
     BigAutoField,
     CharField,
+    CompositeKey,
     DateField,
     DecimalField,
     FloatField,
+    Model,
 )
+
+from database import mysql1
 
 
 # 板块资金流数据模型

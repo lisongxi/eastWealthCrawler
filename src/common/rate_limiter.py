@@ -23,7 +23,9 @@ class TokenBucket:
         self.last_refill = time.time()
         self._lock = asyncio.Lock()
 
-    async def acquire(self, tokens: int = 1, interrupt_event: asyncio.Event = asyncio.Event()):
+    async def acquire(
+        self, tokens: int = 1, interrupt_event: asyncio.Event = asyncio.Event()
+    ):
         """
         获取令牌
         Args:
@@ -44,7 +46,7 @@ class TokenBucket:
 
                 # 等待足够的时间让令牌补充
                 wait_time = (tokens - self.tokens) / self.refill_rate
-                
+
                 # 释放锁，让其他协程运行
                 await asyncio.sleep(min(wait_time, 0.1))
 
