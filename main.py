@@ -78,9 +78,11 @@ async def main():
     from settings.settings import load_settings
     from src.application.services import CrawlerOrchestrator
     from src.common.error_handling import ErrorMiddleware, setup_error_handling
-    from src.common.health_monitoring import HealthCheckScheduler, HealthMonitor
+    from src.common.health_monitoring import (HealthCheckScheduler,
+                                              HealthMonitor)
     from src.container.container import get_container
-    from src.events.event_bus import EventBus, LoggingEventHandler, get_event_bus
+    from src.events.event_bus import (EventBus, LoggingEventHandler,
+                                      get_event_bus)
     from src.pipeline.data_pipeline import DataPipeline, PipelineFactory
 
     logger.info("Starting East Money Stock Data Crawler")
@@ -91,14 +93,8 @@ async def main():
     incremental_time_str = settings.sync.incremental_time
 
     # 根据模式初始化数据库
-    from database import (
-        close_db,
-        ensure_info_tables,
-        ensure_tables_exist,
-        init_db,
-        update_block_info,
-        update_stock_info,
-    )
+    from database import (close_db, ensure_info_tables, ensure_tables_exist,
+                          init_db, update_block_info, update_stock_info)
 
     init_db()
     if sync_mode == "full":
@@ -126,12 +122,22 @@ async def main():
 
     close_db()
 
+    # 初始化依赖注入容器（必须先于限流器初始化）
+    container = get_container()
+
     # 初始化令牌桶限流器
+    from src.common.rate_limiter import RateLimiter, init_rate_limiter
+
     if hasattr(settings.sync, "rate_limit") and settings.sync.rate_limit.enabled:
         bucket_size = settings.sync.rate_limit.bucket_size
         refill_rate = settings.sync.rate_limit.refill_rate
-        from src.common.rate_limiter import init_rate_limiter
 
+        # 创建并注册限流器到容器
+        rate_limiter = RateLimiter()
+        rate_limiter.init(bucket_size, refill_rate)
+        container.register_instance(RateLimiter, rate_limiter)
+
+        # 同时初始化全局实例（保持向后兼容）
         await init_rate_limiter(bucket_size, refill_rate)
         logger.info(
             f"令牌桶限流已启用: 桶大小={bucket_size}, 令牌速率={refill_rate}/秒"
@@ -153,9 +159,6 @@ async def main():
 
     # 设置错误处理
     error_handler = setup_error_handling()
-
-    # 初始化依赖注入容器
-    container = get_container()
 
     # 初始化事件总线
     event_bus = get_event_bus()
@@ -191,8 +194,9 @@ async def main():
 
     # 将 shutdown_event 传递给限流器，以便能够响应中断
     if hasattr(settings.sync, "rate_limit") and settings.sync.rate_limit.enabled:
-        from src.common.rate_limiter import rate_limiter
+        from src.common.rate_limiter import get_rate_limiter
 
+        rate_limiter = get_rate_limiter()
         rate_limiter.set_interrupt_event(shutdown_event)
 
     # 启动健康监控
@@ -206,7 +210,8 @@ async def main():
         container.register_instance(HealthMonitor, health_monitor)
 
         # 注册爬虫服务以便后续解析
-        from src.application.services import BlockCrawlerService, StockCrawlerService
+        from src.application.services import (BlockCrawlerService,
+                                              StockCrawlerService)
 
         container.register_singleton(BlockCrawlerService)
         container.register_singleton(StockCrawlerService)
@@ -263,6 +268,14 @@ async def main():
                 await health_task
         except asyncio.CancelledError:
             pass
+
+        # 关闭 aiohttp Session
+        try:
+            from models.block.blockCrawl import close_http_session
+
+            await close_http_session()
+        except Exception as e:
+            logger.warning(f"关闭 HTTP Session 失败: {e}")
 
         # 首先停止事件总线以允许待处理事件完成
         await event_bus.stop()

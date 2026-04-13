@@ -2,7 +2,8 @@
 个股基本信息表
 """
 
-from peewee import BigAutoField, BooleanField, CharField, DateField, IntegerField, Model
+from peewee import (BigAutoField, BooleanField, CharField, DateField,
+                    IntegerField, Model)
 
 from database import mysql1
 

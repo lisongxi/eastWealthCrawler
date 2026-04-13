@@ -168,11 +168,11 @@ sync:
 - `settings/settings.yaml` - 配置文件
 
 ### 板块爬虫
-- `s_block/blockCrawl.py` - 板块数据爬虫核心实现（保留完整模式需要的函数）
-- `s_block/blockDM.py` - 板块数据模型定义
+- `models.block/blockCrawl.py` - 板块数据爬虫核心实现（保留完整模式需要的函数）
+- `models.block/blockDM.py` - 板块数据模型定义
 
 ### 个股爬虫
-- `s_stock/stockDM.py` - 个股数据模型定义
+- `models.stock/stockDM.py` - 个股数据模型定义
 
 ### 企业级架构（src目录）
 - `src/application/` - 应用层服务（爬虫编排器、服务层）

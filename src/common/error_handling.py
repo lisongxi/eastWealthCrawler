@@ -77,7 +77,7 @@ class ErrorHandler:
         self.error_handlers = {}  # 错误处理器字典
         self.fallback_handler = self._default_error_handler  # 回退处理器
 
-    def register_handler(self, error_type: Type[Exception], handler: Callable):
+    def register_handler(self, error_type: Type[BaseException], handler: Callable):
         """为特定异常类型注册自定义错误处理器"""
         self.error_handlers[error_type] = handler
 
@@ -345,6 +345,10 @@ def setup_error_handling():
     )
     handler.register_handler(
         KeyError, lambda e: logging.getLogger(__name__).error(f"配置错误: {e.message}")
+    )
+    handler.register_handler(
+        asyncio.CancelledError,
+        lambda e: logging.getLogger(__name__).error(f"用户取消: {e.message}"),
     )
 
     return handler

@@ -2,6 +2,7 @@
 数据库连接配置
 """
 
+import time
 from datetime import datetime
 
 from peewee import MySQLDatabase
@@ -19,6 +20,13 @@ mysql1 = MySQLDatabase(
     user=settings.eastWealth.mysql.user,
     password=settings.eastWealth.mysql.password,
 )
+
+# 模型导入必须在 mysql1 定义之后，以避免循环导入
+from models.block.blockDM import BlockCapitalFlow, BlockKline
+from models.block.blockInfo import BlockInfo
+from models.common.task import CrawlTask
+from models.stock.stockDM import StockKline
+from models.stock.stockInfo import StockInfo
 
 
 def init_db():
@@ -41,12 +49,6 @@ def close_db():
 
 def create_tables():
     """创建所有数据表"""
-    from s_block.blockDM import BlockCapitalFlow, BlockKline
-    from s_block.blockInfo import BlockInfo
-    from s_common.task import CrawlTask
-    from s_stock.stockDM import StockKline
-    from s_stock.stockInfo import StockInfo
-
     try:
         with mysql1:
             mysql1.create_tables(
@@ -68,12 +70,6 @@ def create_tables():
 
 def ensure_tables_exist():
     """检查表是否存在，不存在则创建（增量模式用）"""
-    from s_block.blockDM import BlockCapitalFlow, BlockKline
-    from s_block.blockInfo import BlockInfo
-    from s_common.task import CrawlTask
-    from s_stock.stockDM import StockKline
-    from s_stock.stockInfo import StockInfo
-
     tables = [BlockCapitalFlow, BlockKline, StockKline, BlockInfo, StockInfo, CrawlTask]
     try:
         if mysql1.is_closed():
@@ -92,9 +88,6 @@ def ensure_tables_exist():
 
 def ensure_info_tables():
     """确保基本信息表存在，不存在则创建"""
-    from s_block.blockInfo import BlockInfo
-    from s_stock.stockInfo import StockInfo
-
     tables = [BlockInfo, StockInfo]
     try:
         if mysql1.is_closed():
@@ -111,11 +104,10 @@ def ensure_info_tables():
 
 def update_block_info():
     """更新板块基本信息表"""
-    from datetime import datetime
-
     import requests
 
-    from s_block.blockInfo import BlockInfo
+    # 获取请求配置
+    request_config = settings.sync.request
 
     url = "https://push2.eastmoney.com/api/qt/clist/get"
     headers = {
@@ -150,20 +142,20 @@ def update_block_info():
                 "wbp2u": "|0|0|0|web",
             }
 
-            # 添加重试机制
-            max_retries = 3
-            for attempt in range(max_retries):
+            # 使用配置的重试机制
+            for attempt in range(request_config.max_retries):
                 try:
                     response = requests.get(
-                        url, params=params, headers=headers, timeout=30
+                        url,
+                        params=params,
+                        headers=headers,
+                        timeout=request_config.timeout,
                     )
                     data = response.json()
                     break
                 except Exception as e:
-                    if attempt < max_retries - 1:
-                        import time
-
-                        time.sleep(2)
+                    if attempt < request_config.max_retries - 1:
+                        time.sleep(request_config.retry_delay)
                         continue
                     raise
 
@@ -176,7 +168,7 @@ def update_block_info():
             if len(data["data"]["diff"]) < 100:
                 break
             page += 1
-            time.sleep(10)  # 避免请求过快被限流
+            time.sleep(request_config.page_delay)  # 使用配置的翻页间隔
 
         if not all_blocks:
             print("获取板块列表失败")
@@ -270,12 +262,10 @@ def update_block_info():
 
 def update_stock_info():
     """更新个股基本信息表 - 支持翻页获取完整数据"""
-    import time
-    from datetime import datetime
-
     import requests
 
-    from s_stock.stockInfo import StockInfo
+    # 获取请求配置
+    request_config = settings.sync.request
 
     url = "https://push2.eastmoney.com/api/qt/clist/get"
     headers = {
@@ -310,18 +300,20 @@ def update_stock_info():
                 "fields": "f12,f14,f13,f4",
             }
 
-            # 添加重试机制
-            max_retries = 3
-            for attempt in range(max_retries):
+            # 使用配置的重试机制
+            for attempt in range(request_config.max_retries):
                 try:
                     response = requests.get(
-                        url, params=params, headers=headers, timeout=30
+                        url,
+                        params=params,
+                        headers=headers,
+                        timeout=request_config.timeout,
                     )
                     data = response.json()
                     break
                 except Exception as e:
-                    if attempt < max_retries - 1:
-                        time.sleep(2)
+                    if attempt < request_config.max_retries - 1:
+                        time.sleep(request_config.retry_delay)
                         continue
                     raise
 
@@ -335,7 +327,9 @@ def update_stock_info():
             if len(page_stocks) < 100:
                 break
             page += 1
-            time.sleep(10)  # 避免请求过快被限流
+            time.sleep(
+                request_config.page_delay * 3
+            )  # 股票翻页间隔更长，使用配置的翻页间隔乘以3
             print(f"已获取 {len(all_stocks)} 条股票数据, 正在处理第 {page} 页...")
 
         if not all_stocks:
@@ -430,8 +424,6 @@ def update_stock_info():
 
 def get_block_list_from_db():
     """从数据库获取板块列表（用于爬取）"""
-    from s_block.blockInfo import BlockInfo
-
     try:
         # 确保数据库连接
         if mysql1.is_closed():
@@ -454,8 +446,6 @@ def get_block_list_from_db():
 
 def get_stock_list_from_db():
     """从数据库获取股票列表（用于爬取）"""
-    from s_stock.stockInfo import StockInfo
-
     try:
         # 确保数据库连接
         if mysql1.is_closed():
@@ -481,8 +471,6 @@ def get_stock_list_from_db():
 
 def is_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
     """检查任务是否已完成"""
-    from s_common.task import CrawlTask
-
     try:
         if mysql1.is_closed():
             mysql1.connect()
@@ -507,10 +495,6 @@ def is_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
 
 def mark_task_completed(task_type: str, target_code: str, mode_type: str) -> bool:
     """标记任务已完成"""
-    from datetime import datetime
-
-    from s_common.task import CrawlTask
-
     try:
         if mysql1.is_closed():
             mysql1.connect()
@@ -560,8 +544,6 @@ def mark_task_completed(task_type: str, target_code: str, mode_type: str) -> boo
 
 def reset_task(target_code: str, task_type: str) -> bool:
     """重置任务状态（全量模式前删除数据后调用）"""
-    from s_common.task import CrawlTask
-
     try:
         if mysql1.is_closed():
             mysql1.connect()

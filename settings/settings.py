@@ -79,6 +79,21 @@ class RateLimit(BaseModel):
     )
 
 
+class RequestConfig(BaseModel):
+    """请求配置 / Request configuration"""
+
+    max_retries: int = Field(default=3, description="最大重试次数 / Max retry times")
+    retry_delay: int = Field(
+        default=2, description="重试间隔（秒）/ Retry delay in seconds"
+    )
+    page_delay: int = Field(
+        default=3, description="翻页间隔（秒）/ Page delay in seconds"
+    )
+    timeout: int = Field(
+        default=30, description="请求超时（秒）/ Request timeout in seconds"
+    )
+
+
 class Sync(BaseModel):
     """同步配置 / Sync configuration"""
 
@@ -97,6 +112,10 @@ class Sync(BaseModel):
     rate_limit: RateLimit = Field(
         default_factory=RateLimit,
         description="令牌桶限流配置 / Token bucket rate limit configuration",
+    )
+    request: RequestConfig = Field(
+        default_factory=RequestConfig,
+        description="请求配置 / Request configuration",
     )
 
 

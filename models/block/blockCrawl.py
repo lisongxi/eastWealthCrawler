@@ -1,17 +1,39 @@
 """股票板块相关 / Stock Sector Related
-只保留完整模式需要的函数
+使用异步 aiohttp 进行 HTTP 请求
 """
 
+import asyncio
 import json
 import re
+from typing import List
 
-import requests
+import aiohttp
 
 from settings.settings import load_settings
 
+# 共享 aiohttp Session（应在应用生命周期内复用）
+_session: aiohttp.ClientSession | None = None
 
-def get_block_list_db(limit=None):
-    """获取板块列表（用于数据库存储）
+
+async def get_http_session() -> aiohttp.ClientSession:
+    """获取或创建全局 aiohttp Session"""
+    global _session
+    if _session is None or _session.closed:
+        connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
+        _session = aiohttp.ClientSession(connector=connector)
+    return _session
+
+
+async def close_http_session():
+    """关闭全局 aiohttp Session"""
+    global _session
+    if _session and not _session.closed:
+        await _session.close()
+        _session = None
+
+
+async def get_block_list_db(limit=None):
+    """获取板块列表（用于数据库存储）- 异步版本
     Args:
         limit: 获取板块数量限制，None表示不限制
     Returns:
@@ -19,16 +41,15 @@ def get_block_list_db(limit=None):
     """
     url = "https://push2.eastmoney.com/api/qt/clist/get"
 
-    # 使用概念板块
     params = {
         "np": 1,
         "fltt": 1,
         "invt": 2,
-        "fs": "m:90+t:2+f:!50",  # 概念板块，排除ST
+        "fs": "m:90+t:2+f:!50",
         "fields": "f12,f13,f14,f1,f2,f4,f3,f152,f20,f8,f104,f105,f128,f140,f141,f207,f208,f209,f136,f222",
         "fid": "f3",
         "pn": 1,
-        "pz": limit if limit else 500,  # 默认为500，足够获取所有板块
+        "pz": limit if limit else 500,
         "po": 1,
         "dect": 1,
         "ut": "fa5fd1943c7b386f172d6893dbfba10b",
@@ -44,31 +65,36 @@ def get_block_list_db(limit=None):
     }
 
     try:
-        response = requests.get(url, params=params, headers=headers)
-        data = response.json()
+        session = await get_http_session()
+        async with session.get(
+            url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+        ) as response:
+            data = await response.json()
 
-        if data.get("data") and data["data"].get("diff"):
-            blocks = []
-            for item in data["data"]["diff"]:
-                block_info = {
-                    "code": item.get("f12", ""),
-                    "name": item.get("f14", ""),
-                }
-                blocks.append(block_info)
+            if data.get("data") and data["data"].get("diff"):
+                blocks = []
+                for item in data["data"]["diff"]:
+                    block_info = {
+                        "code": item.get("f12", ""),
+                        "name": item.get("f14", ""),
+                    }
+                    blocks.append(block_info)
 
-            print(f"成功获取 {len(blocks)} 个板块信息")
-            return blocks
-        else:
-            print("未获取到板块数据")
-            return []
+                print(f"成功获取 {len(blocks)} 个板块信息")
+                return blocks
+            else:
+                print("未获取到板块数据")
+                return []
 
     except Exception as e:
         print(f"获取板块列表失败: {e}")
         return []
 
 
-def get_block_kline_db(block_code: str, block_name: str, start_date: str = ""):
-    """获取板块价格K线数据（用于数据库存储）
+async def get_block_kline_db(
+    block_code: str, block_name: str, start_date: str = ""
+) -> List:
+    """获取板块价格K线数据（用于数据库存储）- 异步版本
     使用JSONP格式请求
     Args:
         block_code: 板块代码
@@ -81,15 +107,12 @@ def get_block_kline_db(block_code: str, block_name: str, start_date: str = ""):
 
     url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 
-    # 从配置文件读取开始日期（如果未提供）
     if not start_date:
         settings = load_settings()
         start_date = settings.sync.start_date
 
-    # 将日期格式转换为YYYYMMDD格式
     start_date_str = start_date.replace("-", "")
 
-    # 生成唯一的callback名称
     cb = f"jQuery{int(time.time() * 1000)}"
 
     params = {
@@ -97,8 +120,8 @@ def get_block_kline_db(block_code: str, block_name: str, start_date: str = ""):
         "secid": f"90.{block_code}",
         "fields1": "f1,f2,f3,f4,f5,f6",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-        "klt": "101",  # 日K
-        "fqt": "1",  # 前复权
+        "klt": "101",
+        "fqt": "1",
         "beg": start_date_str,
         "end": "20500101",
         "lmt": "1000000",
@@ -139,35 +162,39 @@ def get_block_kline_db(block_code: str, block_name: str, start_date: str = ""):
     }
 
     try:
-        response = requests.get(
-            url, params=params, headers=headers, cookies=cookies, timeout=30
-        )
+        session = await get_http_session()
+        async with session.get(
+            url,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as response:
+            text = await response.text()
 
-        # 解析JSONP，提取纯JSON
-        text = response.text
-        match = re.search(r"\((.*)\)", text, re.S)
-        if match:
-            data = json.loads(match.group(1))
-        else:
-            data = response.json()
+            match = re.search(r"\((.*)\)", text, re.S)
+            if match:
+                data = json.loads(match.group(1))
+            else:
+                data = await response.json()
 
-        if data.get("data") and data["data"].get("klines"):
-            klines = data["data"]["klines"]
-            print(
-                f"  成功获取板块 {block_name} ({block_code}) 的价格K线数据: {len(klines)} 条"
-            )
-            return klines
-        else:
-            print(f"  板块 {block_name} ({block_code}) 没有价格K线数据")
-            return []
+            if data.get("data") and data["data"].get("klines"):
+                klines = data["data"]["klines"]
+                print(
+                    f"  成功获取板块 {block_name} ({block_code}) 的价格K线数据: {len(klines)} 条"
+                )
+                return klines
+            else:
+                print(f"  板块 {block_name} ({block_code}) 没有价格K线数据")
+                return []
 
     except Exception as e:
         print(f"  获取板块 {block_name} ({block_code}) 的价格K线数据失败: {e}")
         return []
 
 
-def get_block_capital_flow_db(block_code, block_name):
-    """获取板块资金流数据（用于数据库存储）
+async def get_block_capital_flow_db(block_code, block_name):
+    """获取板块资金流数据（用于数据库存储）- 异步版本
     Args:
         block_code: 板块代码
         block_name: 板块名称
@@ -180,8 +207,8 @@ def get_block_capital_flow_db(block_code, block_name):
         "secid": f"90.{block_code}",
         "fields1": "f1,f2,f3,f4,f5,f6,f7",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63",
-        "klt": "101",  # 日K
-        "lmt": "1000000",  # 不限制数量
+        "klt": "101",
+        "lmt": "1000000",
         "beg": "19900101",
         "end": "20500101",
         "ut": "fa5fd1943c7b386f172d6893dbfba10b",
@@ -198,24 +225,28 @@ def get_block_capital_flow_db(block_code, block_name):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=30)
-            data = response.json()
+            session = await get_http_session()
+            async with session.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as response:
+                data = await response.json()
 
-            if data.get("data") and data["data"].get("klines"):
-                klines = data["data"]["klines"]
-                print(
-                    f"  成功获取板块 {block_name} ({block_code}) 的资金流数据: {len(klines)} 条"
-                )
-                return klines
-            else:
-                print(f"  板块 {block_name} ({block_code}) 没有资金流数据")
-                return []
+                if data.get("data") and data["data"].get("klines"):
+                    klines = data["data"]["klines"]
+                    print(
+                        f"  成功获取板块 {block_name} ({block_code}) 的资金流数据: {len(klines)} 条"
+                    )
+                    return klines
+                else:
+                    print(f"  板块 {block_name} ({block_code}) 没有资金流数据")
+                    return []
 
         except Exception as e:
             if attempt < max_retries - 1:
-                import time
-
-                time.sleep(2)
+                await asyncio.sleep(2)
                 continue
             print(f"  获取板块 {block_name} ({block_code}) 的资金流数据失败: {e}")
             return []

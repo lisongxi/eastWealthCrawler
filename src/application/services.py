@@ -1,35 +1,39 @@
 """
 应用程序服务和用例
-支持并发爬取 + 令牌桶限流
+支持并发爬取 + 令牌桶限流 + 统一错误处理
 """
 
 import asyncio
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from functools import wraps
 from typing import Dict, List, Optional
 
 from settings.settings import Settings
 from src.container.container import get_container
-from src.domain.entities import (
-    CrawlerConfiguration,
-    CrawlerEvent,
-    CrawlerMetrics,
-    CrawlerStatus,
-    CrawlResult,
-    DataSourceType,
-    SyncType,
-)
-from src.events.event_bus import EventBus
+from src.domain.entities import (CrawlerConfiguration, CrawlerEvent,
+                                 CrawlerMetrics, CrawlerStatus, CrawlResult,
+                                 DataSourceType, SyncType)
+from src.events.event_bus import EventBus, EventType
 from src.pipeline.data_pipeline import DataPipeline
 
 # 导入令牌桶限流器
 try:
-    from src.common.rate_limiter import init_rate_limiter, rate_limiter
+    from src.common.rate_limiter import get_rate_limiter
 
     RATE_LIMITER_AVAILABLE = True
 except ImportError:
     RATE_LIMITER_AVAILABLE = False
+
+# 导入统一错误处理
+try:
+    from src.common.error_handling import (ErrorCategory, ErrorFactory,
+                                           ErrorSeverity)
+
+    ERROR_HANDLING_AVAILABLE = True
+except ImportError:
+    ERROR_HANDLING_AVAILABLE = False
 
 
 class CrawlerService(ABC):
@@ -46,6 +50,20 @@ class CrawlerService(ABC):
         """执行爬虫过程"""
         pass
 
+    def _handle_error(self, error: Exception, context: str):
+        """统一错误处理"""
+        if ERROR_HANDLING_AVAILABLE:
+            app_error = ErrorFactory.create_from_exception(
+                error,
+                context={"service": self.__class__.__name__, "context": context},
+                severity=ErrorSeverity.ERROR,
+            )
+            self.logger.error(f"[{context}] {error}")
+            return app_error
+        else:
+            self.logger.error(f"[{context}] {error}")
+            return None
+
     async def _rate_limit_wait(self):
         """令牌桶限流等待"""
         if not RATE_LIMITER_AVAILABLE:
@@ -57,7 +75,16 @@ class CrawlerService(ABC):
 
         # 检查是否启用令牌桶限流
         if hasattr(settings.sync, "rate_limit") and settings.sync.rate_limit.enabled:
+            rate_limiter = get_rate_limiter()
             await rate_limiter.acquire()
+
+    # 事件类型字符串到枚举的映射
+    _EVENT_TYPE_MAP = {
+        "crawl_started": EventType.CRAWLER_STARTED,
+        "crawl_completed": EventType.CRAWLER_COMPLETED,
+        "crawl_failed": EventType.CRAWLER_FAILED,
+        "metrics_completed": EventType.CRAWLER_COMPLETED,
+    }
 
     def _publish_event(
         self,
@@ -67,8 +94,12 @@ class CrawlerService(ABC):
         data: Optional[Dict] = None,
     ):
         """发布爬虫事件"""
+        # 映射字符串到枚举值，保持向后兼容
+        event_type_enum = self._EVENT_TYPE_MAP.get(
+            event_type, EventType.CRAWLER_COMPLETED
+        )
         event = CrawlerEvent(
-            event_type=event_type,
+            event_type=event_type_enum.value,
             crawler_id=self.__class__.__name__,
             status=status,
             message=message,
@@ -93,7 +124,7 @@ class CrawlerService(ABC):
     def _delete_stock_data(self, stock_code: str, source_type: DataSourceType):
         """删除股票数据（全量模式重新爬取前调用）"""
         from database import mysql1
-        from s_stock.stockDM import StockKline
+        from models.stock.stockDM import StockKline
 
         try:
             if mysql1.is_closed():
@@ -186,38 +217,12 @@ class BlockCrawlerService(CrawlerService):
 
         # 否则从API获取（备用方案）
         self.logger.info("从API获取板块列表...")
-        import requests
-
-        url = "https://push2.eastmoney.com/api/qt/clist/get"
-        params = {
-            "np": 1,
-            "fltt": 1,
-            "invt": 2,
-            "fs": "m:90+t:2+f:!50",
-            "fields": "f12,f14",
-            "fid": "f3",
-            "pn": 1,
-            "pz": 500,
-            "po": 1,
-            "dect": 1,
-            "ut": "fa5fd1943c7b386f172d6893dbfba10b",
-        }
-
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": "https://quote.eastmoney.com/",
-        }
 
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            data = response.json()
+            from models.block.blockCrawl import get_block_list_db
 
-            if data.get("data") and data["data"].get("diff"):
-                blocks = []
-                for item in data["data"]["diff"]:
-                    blocks.append(
-                        {"code": item.get("f12", ""), "name": item.get("f14", "")}
-                    )
+            blocks = await get_block_list_db(limit=500)
+            if blocks:
                 self.logger.info(f"成功获取 {len(blocks)} 个板块")
                 return blocks
         except Exception as e:
@@ -228,7 +233,7 @@ class BlockCrawlerService(CrawlerService):
     def _get_latest_block_date(self, block_code: str) -> Optional[str]:
         """从数据库获取某板块的最新日期"""
         from database import mysql1
-        from s_block.blockDM import BlockKline
+        from models.block.blockDM import BlockKline
 
         try:
             if mysql1.is_closed():
@@ -250,7 +255,7 @@ class BlockCrawlerService(CrawlerService):
     def _delete_block_data(self, block_code: str, source_type: DataSourceType):
         """删除板块数据（全量模式重新爬取前调用）"""
         from database import mysql1
-        from s_block.blockDM import BlockCapitalFlow, BlockKline
+        from models.block.blockDM import BlockCapitalFlow, BlockKline
 
         try:
             if mysql1.is_closed():
@@ -273,7 +278,7 @@ class BlockCrawlerService(CrawlerService):
     def _delete_stock_data(self, stock_code: str, source_type: DataSourceType):
         """删除股票数据（全量模式重新爬取前调用）"""
         from database import mysql1
-        from s_stock.stockDM import StockKline
+        from models.stock.stockDM import StockKline
 
         try:
             if mysql1.is_closed():
@@ -291,12 +296,8 @@ class BlockCrawlerService(CrawlerService):
         """为单个板块爬取数据"""
         from datetime import datetime, timedelta
 
-        from src.domain.entities import (
-            BlockIdentifier,
-            CapitalFlowData,
-            CrawlDataPoint,
-            FinancialData,
-        )
+        from src.domain.entities import (BlockIdentifier, CapitalFlowData,
+                                         CrawlDataPoint, FinancialData)
 
         identifier = BlockIdentifier(code=block["code"], name=block["name"])
 
@@ -342,9 +343,10 @@ class BlockCrawlerService(CrawlerService):
 
         if config.source_type == DataSourceType.BLOCK_KLINE:
             # 获取板块K线数据
-            from s_block.blockCrawl import get_block_kline_db, parse_block_price_kline
+            from models.block.blockCrawl import (get_block_kline_db,
+                                                 parse_block_price_kline)
 
-            klines = get_block_kline_db(block["code"], block["name"], start_date)
+            klines = await get_block_kline_db(block["code"], block["name"], start_date)
 
             for kline_str in klines:
                 parsed = parse_block_price_kline(
@@ -377,13 +379,13 @@ class BlockCrawlerService(CrawlerService):
 
         elif config.source_type == DataSourceType.BLOCK_CAPITAL_FLOW:
             # 获取板块资金流数据
-            from s_block.blockCrawl import (
-                get_block_capital_flow_db,
-                parse_block_capital_flow,
-            )
+            from models.block.blockCrawl import (get_block_capital_flow_db,
+                                                 parse_block_capital_flow)
 
             # 获取资金流数据
-            capital_klines = get_block_capital_flow_db(block["code"], block["name"])
+            capital_klines = await get_block_capital_flow_db(
+                block["code"], block["name"]
+            )
             if not capital_klines:
                 self.logger.info(
                     f"No capital flow data found for block: {block['name']}"
@@ -554,9 +556,10 @@ class StockCrawlerService(CrawlerService):
             self.logger.info(f"从数据库获取 {len(stocks)} 只股票")
             return stocks
 
-        # 否则从API获取（备用方案）
+        # 否则从API获取（备用方案）- 使用异步 aiohttp
         self.logger.info("从API获取股票列表...")
-        import requests
+
+        import aiohttp
 
         url = "https://push2.eastmoney.com/api/qt/clist/get"
         params = {
@@ -578,17 +581,26 @@ class StockCrawlerService(CrawlerService):
         }
 
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            data = response.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as response:
+                    data = await response.json()
 
-            if data.get("data") and data["data"].get("diff"):
-                stocks = []
-                for item in data["data"]["diff"]:
-                    stocks.append(
-                        {"code": item.get("f12", ""), "name": item.get("f14", "")}
-                    )
-                self.logger.info(f"成功获取 {len(stocks)} 只股票")
-                return stocks
+                    if data.get("data") and data["data"].get("diff"):
+                        stocks = []
+                        for item in data["data"]["diff"]:
+                            stocks.append(
+                                {
+                                    "code": item.get("f12", ""),
+                                    "name": item.get("f14", ""),
+                                }
+                            )
+                        self.logger.info(f"成功获取 {len(stocks)} 只股票")
+                        return stocks
         except Exception as e:
             self.logger.error(f"获取股票列表失败: {e}")
 
@@ -597,13 +609,14 @@ class StockCrawlerService(CrawlerService):
     async def _crawl_stock_data(
         self, stock: Dict, config: CrawlerConfiguration
     ) -> Optional[CrawlResult]:
-        """为单只股票爬取真实K线数据"""
+        """为单只股票爬取真实K线数据 - 异步版本"""
         import json
         import re
 
-        import requests
+        import aiohttp
 
-        from src.domain.entities import CrawlDataPoint, FinancialData, StockIdentifier
+        from src.domain.entities import (CrawlDataPoint, FinancialData,
+                                         StockIdentifier)
 
         stock_code = stock["code"]
         stock_name = stock["name"]
@@ -663,11 +676,11 @@ class StockCrawlerService(CrawlerService):
             "secid": secid,
             "fields1": "f1,f2,f3,f4,f5,f6",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-            "klt": "101",  # 日K
-            "fqt": "1",  # 前复权
-            "beg": start_date_str,  # 从配置文件中读取的开始日期
+            "klt": "101",
+            "fqt": "1",
+            "beg": start_date_str,
             "end": "20500101",
-            "lmt": "1000000",  # 不限制数量
+            "lmt": "1000000",
         }
 
         headers = {
@@ -676,16 +689,22 @@ class StockCrawlerService(CrawlerService):
         }
 
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            content = response.text
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as response:
+                    content = await response.text()
 
-            # 处理JSONP回调
-            if "jQuery" in content or "(" in content:
-                match = re.search(r"jQuery.*?\((.*?)\);", content)
-                if match:
-                    content = match.group(1)
+                    # 处理JSONP回调
+                    if "jQuery" in content or "(" in content:
+                        match = re.search(r"jQuery.*?\((.*?)\);", content)
+                        if match:
+                            content = match.group(1)
 
-            data = json.loads(content)
+                    data = json.loads(content)
 
             if not data.get("data") or not data["data"].get("klines"):
                 self.logger.warning(f"股票 {stock['name']} 没有K线数据")
@@ -753,13 +772,13 @@ class StockCrawlerService(CrawlerService):
             )
 
         except Exception as e:
-            self.logger.error(f"爬取股票 {stock['name']} 数据失败: {e}")
+            self._handle_error(e, f"_crawl_stock_data({stock['name']})")
             return None
 
     def _get_latest_date(self, stock_code: str) -> Optional[str]:
         """从数据库获取某只股票的最新日期"""
         from database import mysql1
-        from s_stock.stockDM import StockKline
+        from models.stock.stockDM import StockKline
 
         try:
             if mysql1.is_closed():
