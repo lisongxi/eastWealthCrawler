@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import datetime, time, timedelta
 
-from src.common.error_handling import ErrorMiddleware, setup_error_handling
+from src.infrastructure.error_handling import ErrorMiddleware, setup_error_handling
 
 # 配置日志
 logging.basicConfig(
@@ -65,7 +65,7 @@ async def execute_crawler(crawler_orchestrator, error_handler):
     except Exception as e:
         logger.error(f"Crawler execution error: {e}")
         # 使用 ErrorFactory 创建 ApplicationError
-        from src.common.error_handling import ErrorFactory
+        from src.infrastructure.error_handling import ErrorFactory
 
         application_error = ErrorFactory.create_from_exception(
             e, context={"function": "execute_crawler"}
@@ -77,8 +77,8 @@ async def main():
     """主应用程序入口点"""
     from settings.settings import load_settings
     from src.application.services import CrawlerOrchestrator
-    from src.common.error_handling import ErrorMiddleware, setup_error_handling
-    from src.common.health_monitoring import (HealthCheckScheduler,
+    from src.infrastructure.error_handling import ErrorMiddleware, setup_error_handling
+    from src.infrastructure.health_monitoring import (HealthCheckScheduler,
                                               HealthMonitor)
     from src.container.container import get_container
     from src.events.event_bus import (EventBus, LoggingEventHandler,
@@ -94,7 +94,9 @@ async def main():
 
     # 根据模式初始化数据库
     from database import (close_db, ensure_info_tables, ensure_tables_exist,
-                          init_db, update_block_info, update_stock_info)
+                          init_db)
+    from src.crawlers.info_crawler import (update_block_info,
+                                           update_stock_info)
 
     init_db()
     if sync_mode == "full":
@@ -126,7 +128,7 @@ async def main():
     container = get_container()
 
     # 初始化令牌桶限流器
-    from src.common.rate_limiter import RateLimiter, init_rate_limiter
+    from src.infrastructure.rate_limiter import RateLimiter, init_rate_limiter
 
     if hasattr(settings.sync, "rate_limit") and settings.sync.rate_limit.enabled:
         bucket_size = settings.sync.rate_limit.bucket_size
@@ -194,7 +196,7 @@ async def main():
 
     # 将 shutdown_event 传递给限流器，以便能够响应中断
     if hasattr(settings.sync, "rate_limit") and settings.sync.rate_limit.enabled:
-        from src.common.rate_limiter import get_rate_limiter
+        from src.infrastructure.rate_limiter import get_rate_limiter
 
         rate_limiter = get_rate_limiter()
         rate_limiter.set_interrupt_event(shutdown_event)
@@ -252,7 +254,7 @@ async def main():
     except Exception as e:
         logger.error(f"Application error: {e}")
         # 使用 ErrorFactory 创建 ApplicationError
-        from src.common.error_handling import ErrorFactory
+        from src.infrastructure.error_handling import ErrorFactory
 
         application_error = ErrorFactory.create_from_exception(
             e, context={"function": "main"}
@@ -271,7 +273,7 @@ async def main():
 
         # 关闭 aiohttp Session
         try:
-            from models.block.blockCrawl import close_http_session
+            from src.crawlers import close_http_session
 
             await close_http_session()
         except Exception as e:

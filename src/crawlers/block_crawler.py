@@ -1,35 +1,18 @@
-"""股票板块相关 / Stock Sector Related
-使用异步 aiohttp 进行 HTTP 请求
+"""板块爬虫模块 / Block Crawler Module
+板块相关的 HTTP 请求和数据解析
 """
 
 import asyncio
 import json
 import re
+import time
 from typing import List
 
 import aiohttp
 
 from settings.settings import load_settings
 
-# 共享 aiohttp Session（应在应用生命周期内复用）
-_session: aiohttp.ClientSession | None = None
-
-
-async def get_http_session() -> aiohttp.ClientSession:
-    """获取或创建全局 aiohttp Session"""
-    global _session
-    if _session is None or _session.closed:
-        connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
-        _session = aiohttp.ClientSession(connector=connector)
-    return _session
-
-
-async def close_http_session():
-    """关闭全局 aiohttp Session"""
-    global _session
-    if _session and not _session.closed:
-        await _session.close()
-        _session = None
+from src.crawlers.base import get_http_session
 
 
 async def get_block_list_db(limit=None):
@@ -103,8 +86,6 @@ async def get_block_kline_db(
     Returns:
         价格K线数据列表
     """
-    import time
-
     url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 
     if not start_date:

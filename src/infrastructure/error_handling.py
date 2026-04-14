@@ -125,6 +125,13 @@ class ErrorHandler:
 class ErrorMiddleware:
     """错误处理中间件"""
 
+    # 不应被中间件处理的异常类型（直接传播）
+    EXCLUDED_EXCEPTIONS = (
+        asyncio.CancelledError,
+        KeyboardInterrupt,
+        SystemExit,
+    )
+
     def __init__(self, error_handler: ErrorHandler):
         self.error_handler = error_handler  # 错误处理器
 
@@ -137,6 +144,9 @@ class ErrorMiddleware:
             async def async_wrapper(*args, **kwargs):
                 try:
                     return await func(*args, **kwargs)
+                except self.EXCLUDED_EXCEPTIONS:
+                    # 直接重新抛出被排除的异常
+                    raise
                 except Exception as e:
                     self._handle_exception(e, func.__name__)
                     raise
@@ -148,6 +158,8 @@ class ErrorMiddleware:
             def sync_wrapper(*args, **kwargs):
                 try:
                     return func(*args, **kwargs)
+                except self.EXCLUDED_EXCEPTIONS:
+                    raise
                 except Exception as e:
                     self._handle_exception(e, func.__name__)
                     raise
