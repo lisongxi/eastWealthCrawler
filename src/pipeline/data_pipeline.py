@@ -135,7 +135,7 @@ class StorageHandler(PipelineStepHandler):
 
     async def _save_block_kline(self, data: CrawlResult):
         """保存板块K线数据"""
-        from s_block.blockDM import BlockKline
+        from models.block.blockDM import BlockKline
 
         block_code = data.identifier.code
         block_name = data.identifier.name
@@ -167,7 +167,7 @@ class StorageHandler(PipelineStepHandler):
 
     async def _save_block_capital_flow(self, data: CrawlResult):
         """保存板块资金流数据"""
-        from s_block.blockDM import BlockCapitalFlow
+        from models.block.blockDM import BlockCapitalFlow
 
         block_code = data.identifier.code
         block_name = data.identifier.name
@@ -202,7 +202,7 @@ class StorageHandler(PipelineStepHandler):
 
     async def _save_stock_kline(self, data: CrawlResult):
         """保存股票K线数据"""
-        from s_stock.stockDM import StockKline
+        from models.stock.stockDM import StockKline
 
         stock_code = data.identifier.code
         stock_name = data.identifier.name

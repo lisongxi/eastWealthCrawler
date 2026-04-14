@@ -11,6 +11,12 @@ sync:
     enabled: true  # 是否启用令牌桶限流
     bucket_size: 1  # 桶的大小（同时最大并发请求数）
     refill_rate: 0.1  # 令牌发放速率（每秒发放的令牌数），0.2表示每5秒发放1个令牌
+  # 请求配置
+  request:
+    max_retries: 3  # 最大重试次数
+    retry_delay: 2  # 重试间隔（秒）
+    page_delay: 3  # 翻页间隔（秒）
+    timeout: 30  # 请求超时（秒）
 eastWealth:
   user:
     username: "1"

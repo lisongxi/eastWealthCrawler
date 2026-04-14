@@ -77,7 +77,7 @@ class ErrorHandler:
         self.error_handlers = {}  # 错误处理器字典
         self.fallback_handler = self._default_error_handler  # 回退处理器
 
-    def register_handler(self, error_type: Type[Exception], handler: Callable):
+    def register_handler(self, error_type: Type[BaseException], handler: Callable):
         """为特定异常类型注册自定义错误处理器"""
         self.error_handlers[error_type] = handler
 
@@ -125,6 +125,13 @@ class ErrorHandler:
 class ErrorMiddleware:
     """错误处理中间件"""
 
+    # 不应被中间件处理的异常类型（直接传播）
+    EXCLUDED_EXCEPTIONS = (
+        asyncio.CancelledError,
+        KeyboardInterrupt,
+        SystemExit,
+    )
+
     def __init__(self, error_handler: ErrorHandler):
         self.error_handler = error_handler  # 错误处理器
 
@@ -137,6 +144,9 @@ class ErrorMiddleware:
             async def async_wrapper(*args, **kwargs):
                 try:
                     return await func(*args, **kwargs)
+                except self.EXCLUDED_EXCEPTIONS:
+                    # 直接重新抛出被排除的异常
+                    raise
                 except Exception as e:
                     self._handle_exception(e, func.__name__)
                     raise
@@ -148,6 +158,8 @@ class ErrorMiddleware:
             def sync_wrapper(*args, **kwargs):
                 try:
                     return func(*args, **kwargs)
+                except self.EXCLUDED_EXCEPTIONS:
+                    raise
                 except Exception as e:
                     self._handle_exception(e, func.__name__)
                     raise
@@ -345,6 +357,10 @@ def setup_error_handling():
     )
     handler.register_handler(
         KeyError, lambda e: logging.getLogger(__name__).error(f"配置错误: {e.message}")
+    )
+    handler.register_handler(
+        asyncio.CancelledError,
+        lambda e: logging.getLogger(__name__).error(f"用户取消: {e.message}"),
     )
 
     return handler

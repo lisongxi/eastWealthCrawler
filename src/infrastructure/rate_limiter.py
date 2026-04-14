@@ -10,16 +10,29 @@ import time
 class TokenBucket:
     """令牌桶限流器"""
 
-    def __init__(self, bucket_size: int = 2, refill_rate: float = 2.0):
+    def __init__(self, bucket_size: int = None, refill_rate: float = None):
         """
         初始化令牌桶
         Args:
             bucket_size: 桶的大小（最大令牌数）
             refill_rate: 令牌发放速率（每秒发放的令牌数）
         """
-        self.bucket_size = bucket_size
-        self.refill_rate = refill_rate  # 每秒发放的令牌数
-        self.tokens = float(bucket_size)  # 当前令牌数
+        # 从配置获取默认值
+        if bucket_size is None or refill_rate is None:
+            try:
+                from settings.settings import load_settings
+
+                settings = load_settings()
+                self.bucket_size = bucket_size or settings.sync.rate_limit.bucket_size
+                self.refill_rate = refill_rate or settings.sync.rate_limit.refill_rate
+            except Exception:
+                # 配置不可用时使用硬编码默认值
+                self.bucket_size = bucket_size or 2
+                self.refill_rate = refill_rate or 0.2
+        else:
+            self.bucket_size = bucket_size
+            self.refill_rate = refill_rate
+        self.tokens = float(self.bucket_size)  # 当前令牌数
         self.last_refill = time.time()
         self._lock = asyncio.Lock()
 
@@ -93,14 +106,35 @@ class RateLimiter:
 
 
 # 全局限流器实例
-rate_limiter = RateLimiter()
+_rate_limiter_instance = None
+
+
+def get_rate_limiter() -> RateLimiter:
+    """获取全局限流器实例（委托给容器管理）"""
+    global _rate_limiter_instance
+    if _rate_limiter_instance is None:
+        from src.container.container import get_container
+
+        container = get_container()
+        try:
+            _rate_limiter_instance = container.resolve(RateLimiter)
+        except ValueError:
+            # 如果容器中没有，则使用全局实例
+            _rate_limiter_instance = RateLimiter()
+    return _rate_limiter_instance
 
 
 async def init_rate_limiter(bucket_size: int, refill_rate: float):
     """初始化限流器"""
+    rate_limiter = get_rate_limiter()
     rate_limiter.init(bucket_size, refill_rate)
 
 
 async def acquire():
     """获取令牌"""
+    rate_limiter = get_rate_limiter()
     await rate_limiter.acquire()
+
+
+# 保持向后兼容的全局实例引用
+rate_limiter = RateLimiter()

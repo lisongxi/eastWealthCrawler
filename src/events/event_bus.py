@@ -145,10 +145,19 @@ _event_bus_instance = None
 
 
 def get_event_bus() -> EventBus:
-    """获取全局事件总线实例"""
+    """获取全局事件总线实例（委托给容器管理）"""
     global _event_bus_instance
     if _event_bus_instance is None:
-        _event_bus_instance = EventBus()
+        # 优先使用容器中的实例
+        from src.container.container import get_container
+
+        container = get_container()
+        try:
+            _event_bus_instance = container.resolve(EventBus)
+        except ValueError:
+            # 如果容器中没有，则创建并注册
+            _event_bus_instance = EventBus()
+            container.register_instance(EventBus, _event_bus_instance)
     return _event_bus_instance
 
 
@@ -171,15 +180,18 @@ class EventHandler:
 class LoggingEventHandler(EventHandler):
     """事件日志处理器"""
 
+    # 映射事件类型枚举到日志事件类型
+    EVENT_TYPE_MAPPING = {
+        EventType.CRAWLER_STARTED: "crawler_started",
+        EventType.CRAWLER_COMPLETED: "crawler_completed",
+        EventType.CRAWLER_FAILED: "crawler_failed",
+    }
+
     def register_handlers(self):
         """注册日志处理器"""
-        # 只订阅关键事件类型，避免记录dict类型事件
-        self.event_bus.subscribe("crawl_started", self._log_event)
-        self.event_bus.subscribe("crawl_completed", self._log_event)
-        self.event_bus.subscribe("crawl_failed", self._log_event)
-        self.event_bus.subscribe("metrics_completed", self._log_event)
-        self.event_bus.subscribe("data_saved", self._log_event)
-        self.event_bus.subscribe("error_occurred", self._log_event)
+        # 使用 EventType 枚举值订阅事件
+        for event_type_enum in self.EVENT_TYPE_MAPPING.keys():
+            self.event_bus.subscribe(event_type_enum.value, self._log_event)
 
     def _log_event(self, event: Any):
         """记录事件信息"""
