@@ -1,7 +1,6 @@
 """个股数据库模型"""
 
-from peewee import (BigAutoField, CharField, DateField, DecimalField,
-                    FloatField, Model)
+from peewee import BigAutoField, CharField, DateField, DecimalField, FloatField, Model
 
 from database import mysql1
 
