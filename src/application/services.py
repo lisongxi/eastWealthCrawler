@@ -12,9 +12,15 @@ from typing import Dict, List, Optional
 
 from settings.settings import Settings
 from src.container.container import get_container
-from src.domain.entities import (CrawlerConfiguration, CrawlerEvent,
-                                 CrawlerMetrics, CrawlerStatus, CrawlResult,
-                                 DataSourceType, SyncType)
+from src.domain.entities import (
+    CrawlerConfiguration,
+    CrawlerEvent,
+    CrawlerMetrics,
+    CrawlerStatus,
+    CrawlResult,
+    DataSourceType,
+    SyncType,
+)
 from src.events.event_bus import EventBus, EventType
 from src.pipeline.data_pipeline import DataPipeline
 
@@ -28,8 +34,11 @@ except ImportError:
 
 # 导入统一错误处理
 try:
-    from src.infrastructure.error_handling import (ErrorCategory, ErrorFactory,
-                                           ErrorSeverity)
+    from src.infrastructure.error_handling import (
+        ErrorCategory,
+        ErrorFactory,
+        ErrorSeverity,
+    )
 
     ERROR_HANDLING_AVAILABLE = True
 except ImportError:
@@ -296,8 +305,12 @@ class BlockCrawlerService(CrawlerService):
         """为单个板块爬取数据"""
         from datetime import datetime, timedelta
 
-        from src.domain.entities import (BlockIdentifier, CapitalFlowData,
-                                         CrawlDataPoint, FinancialData)
+        from src.domain.entities import (
+            BlockIdentifier,
+            CapitalFlowData,
+            CrawlDataPoint,
+            FinancialData,
+        )
 
         identifier = BlockIdentifier(code=block["code"], name=block["name"])
 
@@ -343,8 +356,10 @@ class BlockCrawlerService(CrawlerService):
 
         if config.source_type == DataSourceType.BLOCK_KLINE:
             # 获取板块K线数据
-            from src.crawlers.block_crawler import (get_block_kline_db,
-                                                    parse_block_price_kline)
+            from src.crawlers.block_crawler import (
+                get_block_kline_db,
+                parse_block_price_kline,
+            )
 
             klines = await get_block_kline_db(block["code"], block["name"], start_date)
 
@@ -379,8 +394,10 @@ class BlockCrawlerService(CrawlerService):
 
         elif config.source_type == DataSourceType.BLOCK_CAPITAL_FLOW:
             # 获取板块资金流数据
-            from src.crawlers.block_crawler import (get_block_capital_flow_db,
-                                                   parse_block_capital_flow)
+            from src.crawlers.block_crawler import (
+                get_block_capital_flow_db,
+                parse_block_capital_flow,
+            )
 
             # 获取资金流数据
             capital_klines = await get_block_capital_flow_db(
@@ -570,12 +587,14 @@ class StockCrawlerService(CrawlerService):
         """为单只股票爬取真实K线数据 - 异步版本"""
         from datetime import datetime, timedelta
 
-        from src.crawlers.stock_crawler import (generate_secid, get_stock_kline,
-                                               parse_stock_kline)
-        from src.domain.entities import CrawlDataPoint, FinancialData, StockIdentifier
-
         from database import is_task_completed, mark_task_completed
         from settings.settings import load_settings
+        from src.crawlers.stock_crawler import (
+            generate_secid,
+            get_stock_kline,
+            parse_stock_kline,
+        )
+        from src.domain.entities import CrawlDataPoint, FinancialData, StockIdentifier
 
         stock_code = stock["code"]
         stock_name = stock["name"]

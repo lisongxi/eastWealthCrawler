@@ -77,12 +77,10 @@ async def main():
     """主应用程序入口点"""
     from settings.settings import load_settings
     from src.application.services import CrawlerOrchestrator
-    from src.infrastructure.error_handling import ErrorMiddleware, setup_error_handling
-    from src.infrastructure.health_monitoring import (HealthCheckScheduler,
-                                              HealthMonitor)
     from src.container.container import get_container
-    from src.events.event_bus import (EventBus, LoggingEventHandler,
-                                      get_event_bus)
+    from src.events.event_bus import EventBus, LoggingEventHandler, get_event_bus
+    from src.infrastructure.error_handling import ErrorMiddleware, setup_error_handling
+    from src.infrastructure.health_monitoring import HealthCheckScheduler, HealthMonitor
     from src.pipeline.data_pipeline import DataPipeline, PipelineFactory
 
     logger.info("Starting East Money Stock Data Crawler")
@@ -93,10 +91,8 @@ async def main():
     incremental_time_str = settings.sync.incremental_time
 
     # 根据模式初始化数据库
-    from database import (close_db, ensure_info_tables, ensure_tables_exist,
-                          init_db)
-    from src.crawlers.info_crawler import (update_block_info,
-                                           update_stock_info)
+    from database import close_db, ensure_info_tables, ensure_tables_exist, init_db
+    from src.crawlers.info_crawler import update_block_info, update_stock_info
 
     init_db()
     if sync_mode == "full":
@@ -212,8 +208,7 @@ async def main():
         container.register_instance(HealthMonitor, health_monitor)
 
         # 注册爬虫服务以便后续解析
-        from src.application.services import (BlockCrawlerService,
-                                              StockCrawlerService)
+        from src.application.services import BlockCrawlerService, StockCrawlerService
 
         container.register_singleton(BlockCrawlerService)
         container.register_singleton(StockCrawlerService)

@@ -1,5 +1,12 @@
-from peewee import (BigAutoField, CharField, CompositeKey, DateField,
-                    DecimalField, FloatField, Model)
+from peewee import (
+    BigAutoField,
+    CharField,
+    CompositeKey,
+    DateField,
+    DecimalField,
+    FloatField,
+    Model,
+)
 
 from database import mysql1
 

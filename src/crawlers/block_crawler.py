@@ -11,7 +11,6 @@ from typing import List
 import aiohttp
 
 from settings.settings import load_settings
-
 from src.crawlers.base import get_http_session
 
 
